@@ -1,0 +1,128 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String    @map("password_hash")
+  name          String?
+  role          String    @default("user")
+  emailVerified Boolean   @default(false) @map("email_verified")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  addresses   Address[]
+  cartItems   CartItem[]
+  wishlistItems WishlistItem[]
+  orders      Order[]
+}
+
+model Category {
+  id    String   @id
+  label String
+  order Int      @default(0)
+  products Product[]
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  categoryId  String   @map("category_id")
+  category    Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  price       Decimal  @db.Decimal(10, 2)
+  unit        String
+  description String?
+  images      String[] @default([])
+  tags        String[] @default([])
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  cartItems    CartItem[]
+  wishlistItems WishlistItem[]
+  orderLines   OrderLine[]
+}
+
+model Address {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName    String?  @map("full_name")
+  line1       String   @map("line1")
+  line2       String?  @map("line2")
+  city        String
+  postalCode  String?  @map("postal_code")
+  instructions String? @map("instructions")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  orders Order[]
+}
+
+model CartItem {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String   @map("product_id")
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity  Int      @default(1)
+
+  @@unique([userId, productId])
+  @@map("cart_items")
+}
+
+model WishlistItem {
+  id        String  @id @default(cuid())
+  userId    String  @map("user_id")
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String  @map("product_id")
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@map("wishlist_items")
+}
+
+model Order {
+  id         String      @id @default(cuid())
+  userId     String      @map("user_id")
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status     OrderStatus @default(pending)
+  addressId  String      @map("address_id")
+  address    Address     @relation(fields: [addressId], references: [id])
+  subtotal   Decimal     @db.Decimal(10, 2)
+  tax        Decimal     @db.Decimal(10, 2)
+  delivery   Decimal     @db.Decimal(10, 2)
+  grandTotal Decimal     @map("grand_total") @db.Decimal(10, 2)
+  addressSnapshot Json    @map("address_snapshot")
+  createdAt  DateTime    @default(now()) @map("created_at")
+  updatedAt  DateTime    @updatedAt @map("updated_at")
+
+  lines OrderLine[]
+}
+
+model OrderLine {
+  id          String   @id @default(cuid())
+  orderId     String   @map("order_id")
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId   String   @map("product_id")
+  product     Product  @relation(fields: [productId], references: [id])
+  productName String   @map("product_name")
+  quantity    Int
+  unitPrice   Decimal  @map("unit_price") @db.Decimal(10, 2)
+  total       Decimal  @db.Decimal(10, 2)
+
+  @@map("order_lines")
+}
+
+enum OrderStatus {
+  pending
+  confirmed
+  processing
+  shipped
+  delivered
+  cancelled
+}
