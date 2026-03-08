@@ -53,6 +53,7 @@ Production-ready Node + Express + Prisma + PostgreSQL API for the Asanga app.
 | POST | `/auth/login` | No | Login (email, password) |
 | POST | `/auth/signup` | No | Sign up (email, password, name?) |
 | GET | `/auth/me` | Bearer | Current user |
+| POST | `/auth/verify-email` | Bearer | Mark email verified |
 | GET | `/products` | No | List products (category, search, limit, offset) |
 | GET | `/products/categories` | No | List categories |
 | GET | `/products/:id` | No | Product by id |
@@ -64,6 +65,17 @@ Production-ready Node + Express + Prisma + PostgreSQL API for the Asanga app.
 | PUT | `/wishlist` | Bearer | Set wishlist (productIds) |
 | POST | `/orders` | Bearer | Create order (addressId, itemIds?) |
 | GET | `/orders` | Bearer | List user orders |
+| GET | `/orders/:id` | Bearer | Single order (own only) |
+| POST | `/upload` | Admin | Multipart image upload → returns `{ url }` |
+| POST | `/upload/base64` | Admin | JSON `{ image: "data:image/...;base64,..." }` → returns `{ url }` (12MB limit) |
+| POST | `/ocr` | Admin | Multipart image → returns `{ text }` (OCR) |
+| GET | `/admin/products` | Admin | List all products |
+| POST | `/admin/products` | Admin | Create product |
+| PATCH | `/admin/products/:id` | Admin | Update product |
+| DELETE | `/admin/products/:id` | Admin | Delete product |
+| GET | `/admin/orders` | Admin | List all orders |
+| GET | `/admin/orders/:id` | Admin | Single order (with user) |
+| PATCH | `/admin/orders/:id` | Admin | Update order status (body: `{ status }`) |
 
 ## Security
 
