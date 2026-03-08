@@ -53,7 +53,7 @@ router.put(
         const toCreate = items.filter((i) => i.quantity > 0);
         if (toCreate.length === 0) return;
         const productIds = [...new Set(toCreate.map((i) => i.productId))];
-        const products = await tx.product.findMany({ where: { id: { in: productIds } } });
+        const products = await tx.product.findMany({ where: { id: { in: productIds }, isActive: true } });
         const productMap = new Map(products.map((p) => [p.id, p]));
         for (const item of toCreate) {
           if (!productMap.has(item.productId)) continue;

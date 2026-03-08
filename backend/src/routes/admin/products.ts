@@ -121,7 +121,17 @@ router.delete(
   async (req, res, next) => {
     try {
       const { id } = req.params;
-      await prisma.product.delete({ where: { id } });
+      const existing = await prisma.product.findUnique({ where: { id } });
+      if (!existing) {
+        res.status(404).json({ message: "Product not found", code: "NOT_FOUND" });
+        return;
+      }
+      // Hard delete: remove order_lines that reference this product, then delete the product
+      // so products in past orders (e.g. Алим) can be fully removed from the DB
+      await prisma.$transaction([
+        prisma.orderLine.deleteMany({ where: { productId: id } }),
+        prisma.product.delete({ where: { id } }),
+      ]);
       res.status(204).send();
     } catch (e) {
       next(e);

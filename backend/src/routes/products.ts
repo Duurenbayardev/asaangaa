@@ -42,7 +42,7 @@ router.get(
       const limit = Math.min(Number(req.query.limit) || 50, 100);
       const offset = Number(req.query.offset) || 0;
 
-      const where: { categoryId?: string; name?: { contains: string; mode: "insensitive" } } = {};
+      const where: { isActive: true; categoryId?: string; name?: { contains: string; mode: "insensitive" } } = { isActive: true };
       if (category) where.categoryId = category;
       if (search) where.name = { contains: search, mode: "insensitive" };
 
@@ -83,7 +83,7 @@ router.get("/:id", async (req, res, next) => {
     const product = await prisma.product.findUnique({
       where: { id: req.params.id },
     });
-    if (!product) {
+    if (!product || (product as unknown as { isActive?: boolean }).isActive === false) {
       res.status(404).json({ message: "Product not found", code: "NOT_FOUND" });
       return;
     }

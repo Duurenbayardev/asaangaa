@@ -31,7 +31,7 @@ router.put(
       await prisma.$transaction(async (tx) => {
         await tx.wishlistItem.deleteMany({ where: { userId } });
         const existing = await tx.product.findMany({
-          where: { id: { in: productIds } },
+          where: { id: { in: productIds }, isActive: true },
           select: { id: true },
         });
         const validIds = new Set(existing.map((p) => p.id));

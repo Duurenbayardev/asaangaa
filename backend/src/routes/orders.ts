@@ -44,6 +44,10 @@ router.post(
         res.status(400).json({ message: "Basket is empty", code: "EMPTY_BASKET" });
         return;
       }
+      if (cartItems.some((c) => (c.product as unknown as { isActive?: boolean }).isActive === false)) {
+        res.status(400).json({ message: "Basket contains unavailable items", code: "UNAVAILABLE_ITEMS" });
+        return;
+      }
 
       const subtotal = cartItems.reduce(
         (sum, c) => sum + Number(c.product.price) * c.quantity,
