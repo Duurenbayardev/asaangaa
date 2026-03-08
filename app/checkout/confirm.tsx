@@ -144,7 +144,7 @@ export default function CheckoutConfirmScreen() {
               </View>
             )}
             <TouchableOpacity style={styles.successButton} onPress={handleSuccessDismiss}>
-              <Text style={styles.successButtonText}>Сайн байна</Text>
+              <Text style={styles.successButtonText}>Үргэлжлүүлэх</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>

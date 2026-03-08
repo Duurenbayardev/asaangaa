@@ -1,12 +1,13 @@
 import type { Product } from "../types/api";
-import { getApiBaseUrl } from "./api-client";
+import { getApiBaseUrl, parseJsonResponse } from "./api-client";
 import { getAuthHeaders } from "./auth-api";
 
 export async function getAdminProducts(token: string): Promise<Product[]> {
-  const data = await fetch(`${getApiBaseUrl()}/admin/products`, {
+  const res = await fetch(`${getApiBaseUrl()}/admin/products`, {
     headers: getAuthHeaders(token),
-  }).then((r) => r.json());
-  if (!data.items) throw new Error(data.message || "Failed to fetch");
+  });
+  const data = (await parseJsonResponse(res)) as { items?: Product[]; message?: string };
+  if (!res.ok || !data.items) throw new Error((data as { message?: string }).message || "Failed to fetch");
   return data.items;
 }
 
@@ -19,9 +20,9 @@ export async function createProduct(
     headers: { ...getAuthHeaders(token), "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  const data = await res.json();
+  const data = await parseJsonResponse(res);
   if (!res.ok) throw data;
-  return data;
+  return data as Product;
 }
 
 export async function updateProduct(
@@ -34,9 +35,9 @@ export async function updateProduct(
     headers: { ...getAuthHeaders(token), "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  const data = await res.json();
+  const data = await parseJsonResponse(res);
   if (!res.ok) throw data;
-  return data;
+  return data as Product;
 }
 
 export async function deleteProduct(token: string, id: string): Promise<void> {
@@ -44,15 +45,46 @@ export async function deleteProduct(token: string, id: string): Promise<void> {
     method: "DELETE",
     headers: getAuthHeaders(token),
   });
-  if (!res.ok) throw await res.json();
+  if (!res.ok) throw await parseJsonResponse(res);
 }
 
 export async function getAdminOrders(token: string): Promise<AdminOrder[]> {
-  const data = await fetch(`${getApiBaseUrl()}/admin/orders`, {
+  const res = await fetch(`${getApiBaseUrl()}/admin/orders`, {
     headers: getAuthHeaders(token),
-  }).then((r) => r.json());
-  if (!Array.isArray(data)) throw new Error(data.message || "Failed to fetch");
-  return data;
+  });
+  const data = await parseJsonResponse(res);
+  if (!res.ok) throw (data as { message?: string });
+  if (!Array.isArray(data)) throw new Error((data as { message?: string }).message || "Failed to fetch");
+  return data as AdminOrder[];
+}
+
+export async function getAdminOrder(token: string, orderId: string): Promise<AdminOrder | null> {
+  const res = await fetch(`${getApiBaseUrl()}/admin/orders/${orderId}`, {
+    headers: getAuthHeaders(token),
+  });
+  const data = await parseJsonResponse(res);
+  if (!res.ok) {
+    if (res.status === 404) return null;
+    throw data;
+  }
+  return data as AdminOrder;
+}
+
+export type OrderStatus = "pending" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled";
+
+export async function updateOrderStatus(
+  token: string,
+  orderId: string,
+  status: OrderStatus
+): Promise<AdminOrder> {
+  const res = await fetch(`${getApiBaseUrl()}/admin/orders/${orderId}`, {
+    method: "PATCH",
+    headers: { ...getAuthHeaders(token), "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
+  const data = await parseJsonResponse(res);
+  if (!res.ok) throw data;
+  return data as AdminOrder;
 }
 
 export async function uploadImage(token: string, image: { uri: string; type?: string; name?: string }): Promise<string> {
@@ -67,9 +99,22 @@ export async function uploadImage(token: string, image: { uri: string; type?: st
     headers: getAuthHeaders(token),
     body: formData,
   });
-  const data = await res.json();
+  const data = (await parseJsonResponse(res)) as { url?: string };
   if (!res.ok) throw data;
-  const url = data.url as string;
+  const url = data.url ?? "";
+  return url.startsWith("http") ? url : `${getApiBaseUrl()}${url}`;
+}
+
+/** Upload image as base64 data URL (more reliable when multipart fails). */
+export async function uploadImageBase64(token: string, dataUrl: string): Promise<string> {
+  const res = await fetch(`${getApiBaseUrl()}/upload/base64`, {
+    method: "POST",
+    headers: { ...getAuthHeaders(token), "Content-Type": "application/json" },
+    body: JSON.stringify({ image: dataUrl }),
+  });
+  const data = (await parseJsonResponse(res)) as { url?: string };
+  if (!res.ok) throw data;
+  const url = data.url ?? "";
   return url.startsWith("http") ? url : `${getApiBaseUrl()}${url}`;
 }
 
@@ -85,9 +130,9 @@ export async function ocrImage(token: string, image: { uri: string; type?: strin
     headers: getAuthHeaders(token),
     body: formData,
   });
-  const data = await res.json();
+  const data = (await parseJsonResponse(res)) as { text?: string };
   if (!res.ok) throw data;
-  return (data.text as string) ?? "";
+  return data.text ?? "";
 }
 
 export interface AdminOrder {

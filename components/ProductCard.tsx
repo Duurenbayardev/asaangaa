@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { useState } from "react";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { getCategoryLabel } from "../constants/categories";
 import { formatTugrug } from "../lib/formatCurrency";
@@ -14,11 +15,20 @@ type ProductCardProps = {
   variant?: "list" | "grid";
 };
 
+function productImageUri(product: Product): string | undefined {
+  const raw = product.images?.[0];
+  if (!raw?.trim()) return undefined;
+  return resolveImageUrl(raw) ?? (raw.startsWith("http") ? raw : undefined);
+}
+
 export function ProductCard({ product, basketItem, variant = "list" }: ProductCardProps) {
   const { toggleWishlist, wishlist } = useGrocery();
+  const [imageError, setImageError] = useState(false);
 
   const quantity = basketItem?.quantity ?? 0;
   const inWishlist = wishlist.has(product.id);
+  const uri = productImageUri(product);
+  const showPlaceholder = !uri || imageError;
 
   const goToProduct = () =>
     router.push({ pathname: "/product/[id]", params: { id: product.id } });
@@ -27,14 +37,18 @@ export function ProductCard({ product, basketItem, variant = "list" }: ProductCa
     return (
       <Pressable style={styles.gridCard} onPress={goToProduct}>
         <View style={styles.gridImageWrap}>
-          <Image
-            source={
-              product.images[0]
-                ? { uri: resolveImageUrl(product.images[0]) ?? product.images[0] }
-                : require("../assets/logo.png")
-            }
-            style={styles.gridImage}
-          />
+          {showPlaceholder ? (
+            <View style={[styles.gridImage, styles.imagePlaceholder]}>
+              <Ionicons name="image-outline" size={32} color="#CCC" />
+            </View>
+          ) : (
+            <Image
+              source={{ uri }}
+              style={styles.gridImage}
+              resizeMode="cover"
+              onError={() => setImageError(true)}
+            />
+          )}
           <Pressable
             hitSlop={8}
             style={styles.gridWishlist}
@@ -59,14 +73,18 @@ export function ProductCard({ product, basketItem, variant = "list" }: ProductCa
   return (
     <View style={styles.card}>
       <Pressable style={styles.row} onPress={goToProduct}>
-        <Image
-          source={
-            product.images[0]
-              ? { uri: resolveImageUrl(product.images[0]) ?? product.images[0] }
-              : require("../assets/logo.png")
-          }
-          style={styles.thumbnail}
-        />
+        {showPlaceholder ? (
+          <View style={[styles.thumbnail, styles.imagePlaceholder]}>
+            <Ionicons name="image-outline" size={24} color="#CCC" />
+          </View>
+        ) : (
+          <Image
+            source={{ uri: uri! }}
+            style={styles.thumbnail}
+            resizeMode="cover"
+            onError={() => setImageError(true)}
+          />
+        )}
         <View style={{ flex: 1 }}>
           <Text style={styles.name}>{product.name}</Text>
           <Text style={styles.meta}>
@@ -114,6 +132,11 @@ const styles = StyleSheet.create({
     height: 64,
     borderRadius: 10,
     backgroundColor: "#F3F3F3",
+  },
+  imagePlaceholder: {
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F0F0F0",
   },
   name: {
     fontSize: 17,

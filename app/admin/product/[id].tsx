@@ -71,15 +71,19 @@ export default function AdminProductScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.8,
+      base64: true,
     });
     if (result.canceled || !result.assets[0]) return;
     const asset = result.assets[0];
+    const base64 = (asset as { base64?: string }).base64;
+    if (!base64) {
+      Alert.alert("Алдаа", "Зургийн өгөгдөл авахад амжилтгүй. Дахин оролдоно уу.");
+      return;
+    }
+    const mime = asset.uri?.toLowerCase().includes(".png") ? "png" : "jpeg";
+    const dataUrl = `data:image/${mime};base64,${base64}`;
     try {
-      const url = await adminApi.uploadImage(token, {
-        uri: asset.uri,
-        type: "image/jpeg",
-        name: "image.jpg",
-      });
+      const url = await adminApi.uploadImageBase64(token, dataUrl);
       setImages((prev) => [...prev, url]);
     } catch (e) {
       Alert.alert("Алдаа", (e as Error).message ?? "Зураг оруулахад алдаа гарлаа.");

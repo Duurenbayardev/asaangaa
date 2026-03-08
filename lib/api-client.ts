@@ -69,6 +69,32 @@ export interface ApiError {
   status: number;
 }
 
+/** Parse response as JSON. Throws a clear error if the server returned HTML (e.g. wrong URL or 404/500 page). */
+export async function parseJsonResponse(res: Response): Promise<unknown> {
+  const text = await res.text();
+  const trimmed = text.trim();
+  if (trimmed.startsWith("<")) {
+    const url = (res as Response & { url?: string }).url ?? getApiBaseUrl();
+    const hint =
+      res.status === 404
+        ? " The route may not exist (redeploy backend?)."
+        : res.status >= 500
+          ? " Backend may be down or sleeping (e.g. Render free tier – wait ~30s and retry)."
+          : " Check that EXPO_PUBLIC_API_URL points to your backend only (e.g. https://asaangaa.onrender.com).";
+    throw {
+      message: `Server returned HTML instead of JSON (status ${res.status}).${hint} URL: ${url}`,
+      code: "INVALID_RESPONSE",
+      status: res.status,
+    } as ApiError;
+  }
+  if (!trimmed) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {};
+  }
+}
+
 export async function apiRequest<T>(
   path: string,
   options: RequestConfig = {}
@@ -84,18 +110,22 @@ export async function apiRequest<T>(
   try {
     res = await fetch(url, { ...init, headers });
   } catch (e: unknown) {
-    const message =
+    const rawMessage =
       e && typeof e === "object" && "message" in e
         ? String((e as { message: string }).message)
         : "Network request failed";
+    const message =
+      typeof __DEV__ !== "undefined" && __DEV__
+        ? `${rawMessage}. Tried: ${url}`
+        : rawMessage;
     const err: ApiError = {
-      message: `${message}. Tried: ${url}. Base URL: ${baseUrl}`,
+      message,
       code: "NETWORK_ERROR",
       status: 0,
     };
     throw err;
   }
-  const data = await res.json().catch(() => ({}));
+  const data = await parseJsonResponse(res);
 
   if (!res.ok) {
     const err: ApiError = {

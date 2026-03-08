@@ -42,7 +42,6 @@ type GroceryContextValue = {
   addToBasket: (product: Product) => void;
   updateQuantity: (productId: string, quantity: number) => void;
   toggleWishlist: (product: Product) => void;
-  clearBasket: () => void;
   total: number;
   addresses: SavedAddress[];
   addAddress: (address: Omit<SavedAddress, "id">) => Promise<SavedAddress>;
@@ -179,11 +178,6 @@ export const GroceryProvider: React.FC<React.PropsWithChildren> = ({
     });
   };
 
-  const clearBasket = () => {
-    basketSyncSourceRef.current = "local";
-    setBasket({});
-  };
-
   const removeCheckoutItemsFromBasket = (items: BasketItem[]) => {
     basketSyncSourceRef.current = "local";
     setBasket((current) => {
@@ -230,7 +224,6 @@ export const GroceryProvider: React.FC<React.PropsWithChildren> = ({
     addToBasket,
     updateQuantity,
     toggleWishlist,
-    clearBasket,
     total,
     addresses,
     addAddress,

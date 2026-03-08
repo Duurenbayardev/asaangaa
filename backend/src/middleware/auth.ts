@@ -24,25 +24,6 @@ export function auth(req: Request, res: Response, next: NextFunction): void {
   }
 }
 
-export async function authOptional(req: Request, res: Response, next: NextFunction): Promise<void> {
-  const authHeader = req.headers.authorization;
-  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-
-  if (!token) {
-    next();
-    return;
-  }
-
-  try {
-    const decoded = jwt.verify(token, config.jwt.secret) as JwtPayload;
-    req.userId = decoded.userId;
-    req.userEmail = decoded.email;
-    next();
-  } catch {
-    next();
-  }
-}
-
 declare global {
   namespace Express {
     interface Request {

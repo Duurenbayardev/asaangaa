@@ -39,4 +39,36 @@ router.post("/", auth, requireUser, requireAdmin, upload.single("image"), (req, 
   res.json({ url });
 });
 
+const DATA_URL_REGEX = /^data:image\/(jpeg|png|gif|webp);base64,(.+)$/i;
+const MAX_BASE64_SIZE = 10 * 1024 * 1024; // 10MB decoded
+
+router.post("/base64", auth, requireUser, requireAdmin, (req, res, next) => {
+  try {
+    const dataUrl = req.body?.image;
+    if (typeof dataUrl !== "string" || !dataUrl.trim()) {
+      res.status(400).json({ message: "Missing image (expected base64 data URL)", code: "MISSING_IMAGE" });
+      return;
+    }
+    const match = dataUrl.match(DATA_URL_REGEX);
+    if (!match) {
+      res.status(400).json({ message: "Invalid image format (expected data:image/...;base64,...)", code: "INVALID_FORMAT" });
+      return;
+    }
+    const ext = match[1].toLowerCase() === "jpeg" ? "jpg" : match[1];
+    const base64 = match[2];
+    const buffer = Buffer.from(base64, "base64");
+    if (buffer.length > MAX_BASE64_SIZE) {
+      res.status(400).json({ message: "Image too large (max 10MB)", code: "TOO_LARGE" });
+      return;
+    }
+    const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${ext}`;
+    const filepath = path.join(UPLOAD_DIR, filename);
+    fs.writeFileSync(filepath, buffer);
+    const url = `/uploads/${filename}`;
+    res.json({ url });
+  } catch (e) {
+    next(e);
+  }
+});
+
 export default router;

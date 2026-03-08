@@ -50,21 +50,6 @@ export interface Product {
   updatedAt?: string;
 }
 
-export interface ProductListParams {
-  category?: CategoryId;
-  search?: string;
-  limit?: number;
-  offset?: number;
-}
-
-// ----- Category (reference; full config lives in constants/categories) -----
-
-export interface Category {
-  id: CategoryId;
-  label: string;
-  order: number;
-}
-
 // ----- Address -----
 
 export interface SavedAddress {

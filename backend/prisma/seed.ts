@@ -40,7 +40,7 @@ async function main() {
         emailVerified: true,
       },
     });
-    console.log("Admin created:", ADMIN_EMAIL, "/", ADMIN_PASSWORD);
+    console.log("Admin created:", ADMIN_EMAIL);
   } else {
     await prisma.user.update({
       where: { email: ADMIN_EMAIL },

@@ -94,6 +94,21 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Захиалга</Text>
+          <TouchableOpacity
+            style={styles.card}
+            onPress={() => router.push("/orders")}
+            activeOpacity={0.8}
+          >
+            <View style={styles.cardRow}>
+              <Ionicons name="receipt-outline" size={20} color="#8C1A7A" />
+              <Text style={[styles.cardLabel, { color: "#8C1A7A", fontWeight: "600" }]}>Миний захиалга</Text>
+              <Ionicons name="chevron-forward" size={20} color="#8C1A7A" />
+            </View>
+          </TouchableOpacity>
+        </View>
+
         {user?.role === "admin" && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Удирдлага</Text>

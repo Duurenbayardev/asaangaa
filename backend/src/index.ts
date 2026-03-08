@@ -38,7 +38,13 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-app.use(express.json({ limit: "256kb" }));
+// Parse JSON body. Use 12mb for /upload/base64 (base64 images), 256kb for everything else.
+app.use((req, res, next) => {
+  if (req.originalUrl.startsWith("/upload/base64")) {
+    return express.json({ limit: "12mb" })(req, res, next);
+  }
+  return express.json({ limit: "256kb" })(req, res, next);
+});
 
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 

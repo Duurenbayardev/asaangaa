@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Dimensions,
   Image,
   Pressable,
@@ -14,7 +15,6 @@ import {
 const CAROUSEL_ITEM_WIDTH = Dimensions.get("window").width - 40;
 import { AddedToBasketToast } from "../../components/AddedToBasketToast";
 import { Header } from "../../components/Header";
-import { LoadingScreen } from "../../components/LoadingScreen";
 import { VerificationBanner } from "../../components/VerificationBanner";
 import { getCategoryLabel } from "../../constants/categories";
 import { getUnitDisplayLabel } from "../../constants/units";
@@ -25,7 +25,11 @@ import { useGrocery } from "../../context/GroceryContext";
 const THEME_PRIMARY = "#8C1A7A";
 
 function goBack() {
-  router.replace("/(tabs)/home");
+  if (router.canGoBack()) {
+    router.back();
+  } else {
+    router.replace("/(tabs)/home");
+  }
 }
 
 export default function ProductDetailScreen() {
@@ -44,32 +48,18 @@ export default function ProductDetailScreen() {
   const [showAddedToast, setShowAddedToast] = useState(false);
   const [showVerificationBanner, setShowVerificationBanner] = useState(false);
   const dismissToast = useCallback(() => setShowAddedToast(false), []);
-  const imageCount = product?.images?.length ?? 0;
-  const [imagesLoaded, setImagesLoaded] = useState(0);
-  const [showImageLoading, setShowImageLoading] = useState(true);
-  const imageLoadingProgress = imageCount === 0 ? 100 : (imagesLoaded / imageCount) * 100;
+  const [imageLoaded, setImageLoaded] = useState<Record<number, boolean>>({});
+  const [imageError, setImageError] = useState<Record<number, boolean>>({});
 
-  const onHeroImageLoad = useCallback(() => {
-    setImagesLoaded((n) => {
-      const next = n + 1;
-      if (next >= imageCount) {
-        setTimeout(() => setShowImageLoading(false), 300);
-        return imageCount;
-      }
-      return next;
-    });
-  }, [imageCount]);
-
-  useEffect(() => {
-    if (imageCount === 0) setShowImageLoading(false);
-  }, [imageCount]);
-
-  useEffect(() => {
-    const t = setTimeout(() => setShowImageLoading(false), 6000);
-    return () => clearTimeout(t);
+  const onHeroImageLoad = useCallback((index: number) => {
+    setImageLoaded((prev) => ({ ...prev, [index]: true }));
+  }, []);
+  const onHeroImageError = useCallback((index: number) => {
+    setImageError((prev) => ({ ...prev, [index]: true }));
   }, []);
 
-  if (!product) {
+  const productsLoading = products.length === 0;
+  if (!product && !productsLoading) {
     return (
       <View style={styles.container}>
         <Header
@@ -84,6 +74,35 @@ export default function ProductDetailScreen() {
             Энэ бүтээгдэхүүн олдсонгүй. Нүүр эсвэл Ангилалаас дахин оролдоно уу.
           </Text>
         </View>
+      </View>
+    );
+  }
+
+  if (!product && productsLoading) {
+    return (
+      <View style={styles.container}>
+        <Header
+          leftElement={
+            <Pressable onPress={goBack} style={styles.backButton} hitSlop={16}>
+              <Ionicons name="chevron-back" size={22} color="#111111" />
+            </Pressable>
+          }
+        />
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <View style={[styles.heroImageWrap, styles.imagePlaceholder]}>
+            <ActivityIndicator size="large" color={THEME_PRIMARY} />
+          </View>
+          <View style={styles.hero}>
+            <View style={styles.namePlaceholder} />
+            <View style={styles.pricePlaceholder} />
+          </View>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Энэ бүтээгдэхүүний тухай</Text>
+            <View style={styles.bodyPlaceholder}>
+              <ActivityIndicator size="small" color={THEME_PRIMARY} />
+            </View>
+          </View>
+        </ScrollView>
       </View>
     );
   }
@@ -120,7 +139,6 @@ export default function ProductDetailScreen() {
 
   return (
     <View style={styles.container}>
-      {showImageLoading && <LoadingScreen progress={imageLoadingProgress} blocking={false} />}
       <Header
         title={product.name}
         leftElement={
@@ -141,16 +159,39 @@ export default function ProductDetailScreen() {
           style={styles.imageCarousel}
           contentContainerStyle={styles.imageCarouselContent}
         >
-          {product.images.map((src, index) => (
-            <View key={index} style={styles.heroImageWrap}>
-              <Image
-                source={{ uri: resolveImageUrl(src) ?? src }}
-                style={styles.heroImage}
-                resizeMode="cover"
-                onLoad={onHeroImageLoad}
-              />
+          {product.images.length === 0 ? (
+            <View style={[styles.heroImageWrap, styles.imagePlaceholder]}>
+              <Ionicons name="image-outline" size={48} color="#CCC" />
             </View>
-          ))}
+          ) : (
+            product.images.map((src, index) => {
+              const uri = resolveImageUrl(src) ?? (src.startsWith("http") ? src : undefined);
+              const loaded = imageLoaded[index];
+              const failed = imageError[index];
+              return (
+                <View key={index} style={styles.heroImageWrap}>
+                  {uri && !failed ? (
+                    <Image
+                      source={{ uri }}
+                      style={styles.heroImage}
+                      resizeMode="cover"
+                      onLoad={() => onHeroImageLoad(index)}
+                      onError={() => onHeroImageError(index)}
+                    />
+                  ) : null}
+                  {(!loaded && uri && !failed) || failed ? (
+                    <View style={[StyleSheet.absoluteFill, styles.imagePlaceholder]}>
+                      {failed ? (
+                        <Ionicons name="image-outline" size={48} color="#CCC" />
+                      ) : (
+                        <ActivityIndicator size="large" color={THEME_PRIMARY} />
+                      )}
+                    </View>
+                  ) : null}
+                </View>
+              );
+            })
+          )}
         </ScrollView>
 
         <View style={styles.hero}>
@@ -202,9 +243,7 @@ export default function ProductDetailScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Энэ бүтээгдэхүүний тухай</Text>
           <Text style={styles.body}>
-            Sourced from trusted local partners and kept in optimal conditions
-            until it reaches your door. Perfect for everyday cooking, quick
-            snacks and last‑minute top‑ups.
+            {product.description?.trim() || "Тайлбар оруулаагүй байна."}
           </Text>
         </View>
 
@@ -307,6 +346,32 @@ const styles = StyleSheet.create({
     width: CAROUSEL_ITEM_WIDTH,
     height: 280,
     backgroundColor: "#F3F3F3",
+  },
+  imagePlaceholder: {
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F0F0F0",
+  },
+  namePlaceholder: {
+    height: 24,
+    width: "80%",
+    backgroundColor: "#E8E8E8",
+    borderRadius: 4,
+    marginTop: 12,
+  },
+  pricePlaceholder: {
+    height: 20,
+    width: 120,
+    backgroundColor: "#E8E8E8",
+    borderRadius: 4,
+    marginTop: 12,
+  },
+  bodyPlaceholder: {
+    minHeight: 60,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F5F5F5",
+    borderRadius: 8,
   },
   hero: {
     borderRadius: 20,

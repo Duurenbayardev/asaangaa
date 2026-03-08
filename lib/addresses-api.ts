@@ -1,4 +1,4 @@
-import { getApiBaseUrl } from "./api-client";
+import { getApiBaseUrl, parseJsonResponse } from "./api-client";
 import { getAuthHeaders } from "./auth-api";
 
 export type AddressRecord = {
@@ -15,7 +15,7 @@ export async function getAddresses(token: string): Promise<AddressRecord[]> {
   const res = await fetch(`${getApiBaseUrl()}/addresses`, {
     headers: getAuthHeaders(token),
   });
-  const data = await res.json();
+  const data = await parseJsonResponse(res);
   if (!res.ok) throw data;
   return Array.isArray(data) ? data : [];
 }
@@ -36,7 +36,7 @@ export async function createAddress(
       instructions: body.instructions,
     }),
   });
-  const data = await res.json();
+  const data = await parseJsonResponse(res);
   if (!res.ok) throw data;
-  return data;
+  return data as AddressRecord;
 }

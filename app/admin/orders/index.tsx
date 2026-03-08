@@ -3,14 +3,15 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Pressable,
   RefreshControl,
   StyleSheet,
   Text,
   View,
 } from "react-native";
-import { useAuth } from "../../context/AuthContext";
-import * as adminApi from "../../lib/admin-api";
-import { formatTugrug } from "../../lib/formatCurrency";
+import { useAuth } from "../../../context/AuthContext";
+import * as adminApi from "../../../lib/admin-api";
+import { formatTugrug } from "../../../lib/formatCurrency";
 
 const THEME = "#8C1A7A";
 
@@ -56,7 +57,10 @@ export default function AdminOrdersScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} colors={[THEME]} />}
         contentContainerStyle={styles.list}
         renderItem={({ item }) => (
-          <View style={styles.card}>
+          <Pressable
+            style={styles.card}
+            onPress={() => router.push(`/admin/orders/${item.id}`)}
+          >
             <View style={styles.cardRow}>
               <Text style={styles.orderId}>#{item.id.slice(-8)}</Text>
               <Text style={[styles.badge, item.status === "delivered" && styles.badgeSuccess]}>{item.status}</Text>
@@ -64,7 +68,7 @@ export default function AdminOrdersScreen() {
             <Text style={styles.email}>{item.userEmail}</Text>
             <Text style={styles.total}>{formatTugrug(item.grandTotal)}</Text>
             <Text style={styles.date}>{new Date(item.createdAt).toLocaleDateString()}</Text>
-          </View>
+          </Pressable>
         )}
       />
     </View>

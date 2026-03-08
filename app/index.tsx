@@ -230,9 +230,9 @@ const styles = StyleSheet.create({
     backgroundColor: THEME_PRIMARY,
   },
   ctaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "flex-end",
+    position: "absolute",
+    bottom: 24,
+    right: 24,
   },
   secondaryCta: {
     fontSize: 14,
