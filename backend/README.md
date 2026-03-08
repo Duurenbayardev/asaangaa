@@ -75,6 +75,14 @@ Production-ready Node + Express + Prisma + PostgreSQL API for the Asanga app.
 - **Validation** – express-validator on all inputs
 - **Errors** – No stack traces in production responses
 
+## Deploy on Render
+
+- **Root Directory:** `backend` (so build/start run from the backend folder).
+- **Build Command:** `npm install && npm run build && npx prisma migrate deploy`
+- **Start Command:** `npm start` (runs `node dist/index.js`).
+
+Do **not** use `node expo-router/entry` — that is the Expo frontend entry and will fail in the backend directory. A `render.yaml` in the repo root is configured for this backend service.
+
 ## Production checklist
 
 1. Set `NODE_ENV=production`
