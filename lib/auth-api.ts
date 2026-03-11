@@ -29,10 +29,14 @@ export async function verifyEmail(token: string): Promise<User> {
   });
 }
 
-export async function loginWithGoogle(code: string, redirectUri?: string): Promise<AuthTokens> {
+export async function loginWithGoogle(
+  code: string,
+  redirectUri?: string,
+  codeVerifier?: string
+): Promise<AuthTokens> {
   return apiRequest<AuthTokens>("/auth/google", {
     method: "POST",
-    body: JSON.stringify({ code, redirectUri }),
+    body: JSON.stringify({ code, redirectUri, codeVerifier }),
   });
 }
 

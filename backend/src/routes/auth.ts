@@ -109,12 +109,13 @@ router.post("/verify-email", auth, requireUser, async (req, res, next) => {
   }
 });
 
-// ----- Google Sign-In (exchange authorization code for our JWT) -----
+// ----- Google Sign-In (exchange authorization code for our JWT, with PKCE) -----
 router.post(
   "/google",
   validate([
     body("code").isString().notEmpty(),
     body("redirectUri").optional().isString(),
+    body("codeVerifier").isString().notEmpty().withMessage("PKCE code_verifier is required"),
   ]),
   async (req, res, next) => {
     try {
@@ -123,9 +124,9 @@ router.post(
         res.status(503).json({ message: "Google sign-in is not configured", code: "GOOGLE_DISABLED" });
         return;
       }
-      const { code, redirectUri } = req.body as { code: string; redirectUri?: string };
+      const { code, redirectUri, codeVerifier } = req.body as { code: string; redirectUri?: string; codeVerifier: string };
       const client = new OAuth2Client(clientId, clientSecret, redirectUri ?? "postmessage");
-      const { tokens } = await client.getToken(code);
+      const { tokens } = await client.getToken({ code, codeVerifier, redirect_uri: redirectUri ?? undefined });
       const idToken = tokens.id_token;
       if (!idToken) {
         res.status(400).json({ message: "No ID token from Google", code: "INVALID_GOOGLE_RESPONSE" });

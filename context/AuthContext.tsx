@@ -8,7 +8,7 @@ type AuthContextValue = {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, name?: string) => Promise<void>;
-  loginWithGoogle: (code: string, redirectUri?: string) => Promise<void>;
+  loginWithGoogle: (code: string, redirectUri?: string, codeVerifier?: string) => Promise<void>;
   sendOtp: () => Promise<void>;
   verifyOtp: (code: string) => Promise<void>;
   verifyEmail: () => Promise<void>;
@@ -52,10 +52,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const loginWithGoogle = useCallback(async (code: string, redirectUri?: string) => {
+  const loginWithGoogle = useCallback(async (code: string, redirectUri?: string, codeVerifier?: string) => {
     setIsLoading(true);
     try {
-      const data = await authApi.loginWithGoogle(code, redirectUri);
+      const data = await authApi.loginWithGoogle(code, redirectUri, codeVerifier);
       setTokenState(data.accessToken);
       setUser(data.user);
     } finally {

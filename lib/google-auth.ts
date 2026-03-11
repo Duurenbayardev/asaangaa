@@ -8,7 +8,10 @@ import * as AuthSession from "expo-auth-session";
 import * as WebBrowser from "expo-web-browser";
 
 const SCOPES = ["openid", "email", "profile"];
-const AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
+
+const GOOGLE_DISCOVERY = {
+  authorizationEndpoint: "https://accounts.google.com/o/oauth2/v2/auth",
+};
 
 function getGoogleClientId(): string {
   try {
@@ -27,6 +30,7 @@ function getGoogleClientId(): string {
 export interface GoogleAuthResult {
   code: string;
   redirectUri: string;
+  codeVerifier: string;
 }
 
 /**
@@ -46,15 +50,19 @@ export async function signInWithGoogleAsync(): Promise<GoogleAuthResult | null> 
     useProxy: __DEV__,
   });
 
+  if (__DEV__) {
+    console.log("[Google Auth] Add this exact URL to Google Console → Credentials → your OAuth client → Authorized redirect URIs:", redirectUri);
+  }
+
   const request = new AuthSession.AuthRequest({
     clientId,
     redirectUri,
     scopes: SCOPES,
     responseType: AuthSession.ResponseType.Code,
-    usePKCE: false,
+    usePKCE: true,
   });
 
-  await request.makeAuthUrlAsync();
+  await request.makeAuthUrlAsync(GOOGLE_DISCOVERY);
   const result = await WebBrowser.openAuthSessionAsync(
     request.url,
     redirectUri,
@@ -67,5 +75,11 @@ export async function signInWithGoogleAsync(): Promise<GoogleAuthResult | null> 
   const code = url.searchParams.get("code") ?? url.searchParams.get("id_token");
   if (!code) return null;
 
-  return { code, redirectUri };
+  const codeVerifier = request.codeVerifier;
+  if (!codeVerifier) {
+    if (__DEV__) console.warn("[Google Auth] PKCE code_verifier missing");
+    return null;
+  }
+
+  return { code, redirectUri, codeVerifier };
 }

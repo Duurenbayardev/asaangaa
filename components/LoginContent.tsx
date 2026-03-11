@@ -169,7 +169,7 @@ export function LoginContent({ onContinue, showHeader = false, onHeroImageLoad }
                   setError("Google нэвтрэлт тохируулаагүй эсвэл цуцлагдсан.");
                   return;
                 }
-                await auth.loginWithGoogle(result.code, result.redirectUri);
+                await auth.loginWithGoogle(result.code, result.redirectUri, result.codeVerifier);
                 onContinue();
               } catch (e: unknown) {
                 const msg = e && typeof e === "object" && "message" in e
