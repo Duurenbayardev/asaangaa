@@ -66,6 +66,9 @@ export default function AdminOrdersScreen() {
               <Text style={[styles.badge, item.status === "delivered" && styles.badgeSuccess]}>{item.status}</Text>
             </View>
             <Text style={styles.email}>{item.userEmail}</Text>
+            {(item.address as { phone?: string })?.phone ? (
+              <Text style={styles.phone}>Утас: {(item.address as { phone: string }).phone}</Text>
+            ) : null}
             <Text style={styles.total}>{formatTugrug(item.grandTotal)}</Text>
             <Text style={styles.date}>{new Date(item.createdAt).toLocaleDateString()}</Text>
           </Pressable>
@@ -94,6 +97,7 @@ const styles = StyleSheet.create({
   badge: { fontSize: 11, fontWeight: "600", color: "#666", textTransform: "uppercase" },
   badgeSuccess: { color: "#2E7D32" },
   email: { fontSize: 13, color: "#666", marginTop: 8 },
+  phone: { fontSize: 13, color: "#555", marginTop: 2 },
   total: { fontSize: 16, fontWeight: "700", color: THEME, marginTop: 4 },
   date: { fontSize: 12, color: "#999", marginTop: 4 },
 });

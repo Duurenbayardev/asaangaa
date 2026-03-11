@@ -60,6 +60,7 @@ export interface SavedAddress {
   line2?: string;
   city: string;
   postalCode?: string;
+  phone?: string;
   instructions?: string;
   createdAt?: string;
 }
@@ -113,6 +114,7 @@ export interface OrderAddressSnapshot {
   line2?: string;
   city: string;
   postalCode?: string;
+  phone?: string;
   instructions?: string;
 }
 
@@ -132,5 +134,6 @@ export interface Order {
 
 export interface CreateOrderBody {
   addressId: string;
+  phone: string;
   itemIds?: string[]; // optional: subset of basket; if omitted, use full basket
 }

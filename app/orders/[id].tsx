@@ -86,7 +86,7 @@ export default function OrderDetailScreen() {
     dateStyle: "medium",
     timeStyle: "short",
   });
-  const addr = order.address as { fullName?: string; line1?: string; line2?: string; city?: string; postalCode?: string; instructions?: string } | undefined;
+  const addr = order.address as { fullName?: string; line1?: string; line2?: string; city?: string; postalCode?: string; phone?: string; instructions?: string } | undefined;
 
   return (
     <View style={styles.container}>
@@ -126,7 +126,7 @@ export default function OrderDetailScreen() {
           ))}
         </View>
 
-        <Text style={styles.sectionTitle}>Хаяг</Text>
+        <Text style={styles.sectionTitle}>Хаяг ба холбоо барих</Text>
         <View style={styles.card}>
           {addr && (
             <Text style={styles.addressText}>
@@ -137,6 +137,7 @@ export default function OrderDetailScreen() {
               {"\n"}
               {addr.city}
               {addr.postalCode ? ` ${addr.postalCode}` : ""}
+              {addr.phone ? `\nУтас: ${addr.phone}` : ""}
               {addr.instructions ? `\n${addr.instructions}` : ""}
             </Text>
           )}

@@ -15,7 +15,7 @@ export interface CreateOrderResponse {
 
 export async function createOrder(
   token: string,
-  body: { addressId: string; itemIds?: string[] }
+  body: { addressId: string; phone: string; itemIds?: string[] }
 ): Promise<CreateOrderResponse> {
   const res = await fetch(`${getApiBaseUrl()}/orders`, {
     method: "POST",

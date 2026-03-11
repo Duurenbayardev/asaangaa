@@ -91,7 +91,7 @@ export default function AdminOrderDetailScreen() {
     dateStyle: "medium",
     timeStyle: "short",
   });
-  const addr = order.address as { fullName?: string; line1?: string; line2?: string; city?: string; postalCode?: string; instructions?: string } | undefined;
+  const addr = order.address as { fullName?: string; line1?: string; line2?: string; city?: string; postalCode?: string; phone?: string; instructions?: string } | undefined;
 
   return (
     <ScrollView
@@ -152,7 +152,7 @@ export default function AdminOrderDetailScreen() {
         ))}
       </View>
 
-      <Text style={styles.sectionTitle}>Хаяг</Text>
+      <Text style={styles.sectionTitle}>Хаяг ба утас</Text>
       <View style={styles.card}>
         {addr && (
           <Text style={styles.addressText}>
@@ -163,6 +163,7 @@ export default function AdminOrderDetailScreen() {
             {"\n"}
             {addr.city}
             {addr.postalCode ? ` ${addr.postalCode}` : ""}
+            {addr.phone ? `\nУтас: ${addr.phone}` : ""}
             {addr.instructions ? `\n${addr.instructions}` : ""}
           </Text>
         )}

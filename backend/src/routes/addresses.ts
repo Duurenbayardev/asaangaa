@@ -15,6 +15,7 @@ function toAddress(a: {
   line2: string | null;
   city: string;
   postalCode: string | null;
+  phone: string | null;
   instructions: string | null;
   createdAt: Date;
 }) {
@@ -25,6 +26,7 @@ function toAddress(a: {
     line2: a.line2 ?? undefined,
     city: a.city,
     postalCode: a.postalCode ?? undefined,
+    phone: a.phone ?? undefined,
     instructions: a.instructions ?? undefined,
     createdAt: a.createdAt.toISOString(),
   };
@@ -50,11 +52,12 @@ router.post(
     body("fullName").optional().isString().trim(),
     body("line2").optional().isString().trim(),
     body("postalCode").optional().isString().trim(),
+    body("phone").optional().isString().trim(),
     body("instructions").optional().isString().trim(),
   ]),
   async (req, res, next) => {
     try {
-      const { line1, city, fullName, line2, postalCode, instructions } = req.body;
+      const { line1, city, fullName, line2, postalCode, phone, instructions } = req.body;
       const address = await prisma.address.create({
         data: {
           userId: req.userId!,
@@ -63,6 +66,7 @@ router.post(
           fullName: fullName || null,
           line2: line2 || null,
           postalCode: postalCode || null,
+          phone: phone || null,
           instructions: instructions || null,
         },
       });

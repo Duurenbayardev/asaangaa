@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { Header } from "../../components/Header";
 import { useAuth } from "../../context/AuthContext";
 import { useGrocery } from "../../context/GroceryContext";
@@ -31,6 +31,7 @@ export default function CheckoutConfirmScreen() {
   const [showOrderSuccess, setShowOrderSuccess] = useState(false);
   const [orderResult, setOrderResult] = useState<CreateOrderResponse | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [phone, setPhone] = useState("");
 
   const { subtotal, tax, delivery, grandTotal, lines } = useMemo(() => {
     if (!checkoutItems || checkoutItems.length === 0) {
@@ -70,14 +71,20 @@ export default function CheckoutConfirmScreen() {
       router.replace("/(tabs)/profile");
       return;
     }
+    const phoneTrim = phone.trim();
     if (!token || !checkoutAddress?.id || !checkoutItems?.length) {
       Alert.alert("Алдаа", "Хаяг эсвэл захиалгын мэдээлэл дутуу байна.");
+      return;
+    }
+    if (!phoneTrim) {
+      Alert.alert("Алдаа", "Хүргэлтийн утасны дугаараа оруулна уу.");
       return;
     }
     setSubmitting(true);
     try {
       const order = await createOrder(token, {
         addressId: checkoutAddress.id,
+        phone: phoneTrim,
         itemIds: checkoutItems.map((i) => i.product.id),
       });
       removeCheckoutItemsFromBasket(checkoutItems);
@@ -201,6 +208,18 @@ export default function CheckoutConfirmScreen() {
               {line}
             </Text>
           ))}
+        </View>
+
+        <Text style={[styles.sectionTitle, styles.sectionSpacing]}>Утасны дугаар</Text>
+        <View style={styles.card}>
+          <TextInput
+            style={styles.phoneInput}
+            placeholder="Хүргэлттэй холбохоор утасны дугаар"
+            placeholderTextColor="#B0B0B0"
+            value={phone}
+            onChangeText={setPhone}
+            keyboardType="phone-pad"
+          />
         </View>
 
         <Text style={[styles.sectionTitle, styles.sectionSpacing]}>Төлбөрийн тойм</Text>
@@ -360,6 +379,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#333333",
     marginBottom: 4,
+  },
+  phoneInput: {
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#E1E1E1",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: "#111111",
+    backgroundColor: "#FAFAFA",
   },
   summaryRow: {
     flexDirection: "row",

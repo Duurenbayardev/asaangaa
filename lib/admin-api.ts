@@ -142,7 +142,7 @@ export interface AdminOrder {
   userName: string | null;
   status: string;
   lines: { productId: string; productName: string; quantity: number; unitPrice: number; total: number }[];
-  address: Record<string, unknown>;
+  address: Record<string, unknown> & { phone?: string };
   subtotal: number;
   tax: number;
   delivery: number;

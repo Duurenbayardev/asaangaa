@@ -2,10 +2,12 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
+  ActivityIndicator,
   Image,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -15,7 +17,10 @@ import { useAuth } from "../../context/AuthContext";
 import { useGrocery } from "../../context/GroceryContext";
 
 export default function ProfileScreen() {
-  const { user, verifyEmail, logout: authLogout, isLoading: authLoading } = useAuth();
+  const { user, sendOtp, verifyOtp, logout: authLogout, isLoading: authLoading } = useAuth();
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
+  const [otpError, setOtpError] = useState<string | null>(null);
   const { addresses, basket, wishlist, total, userVerified } = useGrocery();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const displayName = user?.name?.trim() || user?.email?.split("@")[0] || "Зочлон худалдан авагч";
@@ -79,17 +84,63 @@ export default function ProfileScreen() {
                 {userVerified ? "Баталгаажсан" : "Баталгаажаагүй"}
               </Text>
             </View>
-            {!userVerified && (
-              <TouchableOpacity
-                style={[styles.verifyButton, authLoading && styles.verifyButtonDisabled]}
-                onPress={user ? verifyEmail : undefined}
-                disabled={authLoading || !user}
-              >
-                <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" />
-                <Text style={styles.verifyButtonText}>
-                  {user ? "И-мэйлээ баталгаажуулах" : "Нэвтэрч баталгаажуулна уу"}
-                </Text>
-              </TouchableOpacity>
+            {!userVerified && user && (
+              <View style={styles.otpBlock}>
+                {!otpSent ? (
+                  <TouchableOpacity
+                    style={[styles.verifyButton, authLoading && styles.verifyButtonDisabled]}
+                    onPress={async () => {
+                      setOtpError(null);
+                      try {
+                        await sendOtp();
+                        setOtpSent(true);
+                      } catch (e: unknown) {
+                        setOtpError(e && typeof e === "object" && "message" in e ? String((e as { message: string }).message) : "Код илгээхэд алдаа гарлаа.");
+                      }
+                    }}
+                    disabled={authLoading}
+                  >
+                    {authLoading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Ionicons name="mail-outline" size={20} color="#FFFFFF" />}
+                    <Text style={styles.verifyButtonText}>И-мэйл рүү OTP код илгээх</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <>
+                    <Text style={styles.otpHint}>И-мэйлээр ирсэн 6 оронтой кодыг оруулна уу.</Text>
+                    <TextInput
+                      style={styles.otpInput}
+                      placeholder="000000"
+                      placeholderTextColor="#B0B0B0"
+                      value={otpCode}
+                      onChangeText={(t) => { setOtpCode(t.replace(/\D/g, "").slice(0, 6)); setOtpError(null); }}
+                      keyboardType="number-pad"
+                      maxLength={6}
+                    />
+                    {otpError ? <Text style={styles.otpError}>{otpError}</Text> : null}
+                    <View style={styles.otpRow}>
+                      <TouchableOpacity style={styles.otpSecondaryBtn} onPress={() => { setOtpSent(false); setOtpCode(""); setOtpError(null); }}>
+                        <Text style={styles.otpSecondaryText}>Буцах</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.verifyButton, (authLoading || otpCode.length !== 6) && styles.verifyButtonDisabled]}
+                        onPress={async () => {
+                          setOtpError(null);
+                          try {
+                            await verifyOtp(otpCode);
+                            setOtpSent(false);
+                            setOtpCode("");
+                          } catch (e: unknown) {
+                            setOtpError(e && typeof e === "object" && "message" in e ? String((e as { message: string }).message) : "Код буруу байна.");
+                          }
+                        }}
+                        disabled={authLoading || otpCode.length !== 6}
+                      >
+                        {authLoading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" />}
+                        <Text style={styles.verifyButtonText}>Баталгаажуулах</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                )}
+              </View>
             )}
           </View>
         </View>
@@ -405,4 +456,22 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#FFFFFF",
   },
+  otpBlock: { marginTop: 12 },
+  otpHint: { fontSize: 13, color: "#666", marginBottom: 8 },
+  otpInput: {
+    borderWidth: 1,
+    borderColor: "#E1E1E1",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 18,
+    letterSpacing: 8,
+    color: "#111",
+    backgroundColor: "#FAFAFA",
+    marginBottom: 8,
+  },
+  otpError: { fontSize: 13, color: "#C62828", marginBottom: 8 },
+  otpRow: { flexDirection: "row", gap: 12, alignItems: "center", marginTop: 8 },
+  otpSecondaryBtn: { paddingVertical: 10, paddingHorizontal: 16 },
+  otpSecondaryText: { fontSize: 15, fontWeight: "600", color: "#666" },
 });

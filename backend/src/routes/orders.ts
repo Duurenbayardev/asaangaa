@@ -16,13 +16,14 @@ router.post(
   "/",
   validate([
     body("addressId").isString().notEmpty(),
+    body("phone").isString().trim().notEmpty().withMessage("Phone number is required for delivery"),
     body("itemIds").optional().isArray(),
     body("itemIds.*").optional().isString(),
   ]),
   async (req, res, next) => {
     try {
       const userId = req.userId!;
-      const { addressId, itemIds } = req.body as { addressId: string; itemIds?: string[] };
+      const { addressId, phone, itemIds } = req.body as { addressId: string; phone: string; itemIds?: string[] };
 
       const address = await prisma.address.findFirst({
         where: { id: addressId, userId },
@@ -63,6 +64,7 @@ router.post(
         line2: address.line2 ?? undefined,
         city: address.city,
         postalCode: address.postalCode ?? undefined,
+        phone: phone.trim(),
         instructions: address.instructions ?? undefined,
       };
 

@@ -29,4 +29,26 @@ export async function verifyEmail(token: string): Promise<User> {
   });
 }
 
+export async function loginWithGoogle(code: string, redirectUri?: string): Promise<AuthTokens> {
+  return apiRequest<AuthTokens>("/auth/google", {
+    method: "POST",
+    body: JSON.stringify({ code, redirectUri }),
+  });
+}
+
+export async function sendOtp(token: string): Promise<void> {
+  await apiRequest<{ message: string }>("/auth/send-otp", {
+    method: "POST",
+    headers: getAuthHeaders(token),
+  });
+}
+
+export async function verifyOtp(token: string, code: string): Promise<User> {
+  return apiRequest<User>("/auth/verify-otp", {
+    method: "POST",
+    headers: getAuthHeaders(token),
+    body: JSON.stringify({ code }),
+  });
+}
+
 export { getAuthHeaders };

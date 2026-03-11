@@ -10,17 +10,32 @@ datasource db {
 model User {
   id            String    @id @default(cuid())
   email         String    @unique
-  passwordHash  String    @map("password_hash")
+  passwordHash  String?   @map("password_hash")
+  googleId      String?   @unique @map("google_id")
   name          String?
   role          String    @default("user")
   emailVerified Boolean   @default(false) @map("email_verified")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
-  addresses   Address[]
-  cartItems   CartItem[]
+  addresses    Address[]
+  cartItems    CartItem[]
   wishlistItems WishlistItem[]
-  orders      Order[]
+  orders       Order[]
+  otpCodes     OtpCode[]
+}
+
+model OtpCode {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  code      String
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("otp_codes")
 }
 
 model Category {
@@ -50,16 +65,17 @@ model Product {
 }
 
 model Address {
-  id          String   @id @default(cuid())
-  userId      String   @map("user_id")
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  fullName    String?  @map("full_name")
-  line1       String   @map("line1")
-  line2       String?  @map("line2")
-  city        String
-  postalCode  String?  @map("postal_code")
-  instructions String? @map("instructions")
-  createdAt   DateTime @default(now()) @map("created_at")
+  id           String   @id @default(cuid())
+  userId       String   @map("user_id")
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName     String?  @map("full_name")
+  line1        String   @map("line1")
+  line2        String?  @map("line2")
+  city         String
+  postalCode   String?  @map("postal_code")
+  phone        String?  @map("phone")
+  instructions String?  @map("instructions")
+  createdAt    DateTime @default(now()) @map("created_at")
 
   orders Order[]
 }
