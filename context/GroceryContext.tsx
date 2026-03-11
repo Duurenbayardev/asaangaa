@@ -1,5 +1,13 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { CategoryId } from "../constants/categories";
+import {
+  getCached,
+  setCached,
+  PRODUCTS_CACHE_TTL_MS,
+  BASKET_CACHE_TTL_MS,
+  ADDRESSES_CACHE_TTL_MS,
+  CACHE_KEYS,
+} from "../lib/cache";
 import { getAddresses, createAddress } from "../lib/addresses-api";
 import { getBasket, putBasket } from "../lib/basket-api";
 import { fetchProducts } from "../lib/products-api";
@@ -72,68 +80,143 @@ export const GroceryProvider: React.FC<React.PropsWithChildren> = ({
   const userVerified = auth.user ? auth.user.emailVerified : localUserVerified;
   const setUserVerified = setLocalUserVerified;
   const basketSyncSourceRef = useRef<"api" | "local">("api");
+  const putBasketTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const refreshProducts = useCallback(() => {
     fetchProducts()
-      .then((list) => setProducts(list))
+      .then((list) => {
+        setProducts(list);
+        setCached(CACHE_KEYS.products, list, PRODUCTS_CACHE_TTL_MS);
+      })
       .catch(() => setProducts([]));
   }, []);
 
+  // Products: cache-first, then revalidate after a short delay when we have cache to avoid bursting the server
   useEffect(() => {
-    refreshProducts();
-  }, [refreshProducts]);
+    let cancelled = false;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    getCached<Product[]>(CACHE_KEYS.products).then((cached) => {
+      if (cancelled) return;
+      if (cached?.length) setProducts(cached);
+      const delayMs = (cached?.length ?? 0) > 0 ? 1200 : 0;
+      timeoutId = setTimeout(() => {
+        fetchProducts()
+          .then((list) => {
+            if (!cancelled) {
+              setProducts(list);
+              setCached(CACHE_KEYS.products, list, PRODUCTS_CACHE_TTL_MS);
+            }
+          })
+          .catch(() => {
+            if (!cancelled) setProducts([]);
+          });
+      }, delayMs);
+    });
+    return () => {
+      cancelled = true;
+      if (timeoutId != null) clearTimeout(timeoutId);
+    };
+  }, []);
 
+
+  const userCacheKey = auth.user?.id ?? (auth.token ? "session" : null);
+
+  // Addresses: cache-first when logged in, then revalidate after delay to avoid burst with products/basket
   useEffect(() => {
     if (!auth.token) {
       setAddresses([]);
       return;
     }
+    const key = userCacheKey ? CACHE_KEYS.addresses(userCacheKey) : null;
     let cancelled = false;
-    getAddresses(auth.token)
-      .then((list) => {
-        if (!cancelled) setAddresses(list);
-      })
-      .catch(() => {
-        if (!cancelled) setAddresses([]);
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    if (key) {
+      getCached<SavedAddress[]>(key).then((cached) => {
+        if (!cancelled && Array.isArray(cached) && cached.length >= 0) setAddresses(cached);
       });
-    return () => { cancelled = true; };
-  }, [auth.token]);
+    }
+    timeoutId = setTimeout(() => {
+      getAddresses(auth.token!)
+        .then((list) => {
+          if (!cancelled) {
+            setAddresses(list);
+            if (key) setCached(key, list, ADDRESSES_CACHE_TTL_MS);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) setAddresses([]);
+        });
+    }, 600);
+    return () => {
+      cancelled = true;
+      if (timeoutId != null) clearTimeout(timeoutId);
+    };
+  }, [auth.token, userCacheKey]);
 
+  // Basket: cache-first when logged in, then revalidate after delay to avoid burst with products/addresses
   useEffect(() => {
     if (!auth.token) {
       setBasket({});
       return;
     }
+    const key = userCacheKey ? CACHE_KEYS.basket(userCacheKey) : null;
     let cancelled = false;
-    getBasket(auth.token)
-      .then((next) => {
-        if (!cancelled) {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    if (key) {
+      getCached<Basket>(key).then((cached) => {
+        if (!cancelled && cached && typeof cached === "object") {
           basketSyncSourceRef.current = "api";
-          setBasket(next);
+          setBasket(cached);
         }
-      })
-      .catch(() => {
-        if (!cancelled) setBasket({});
       });
+    }
+    timeoutId = setTimeout(() => {
+      getBasket(auth.token!)
+        .then((next) => {
+          if (!cancelled) {
+            basketSyncSourceRef.current = "api";
+            setBasket(next);
+            if (key) setCached(key, next, BASKET_CACHE_TTL_MS);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) setBasket({});
+        });
+    }, 900);
     return () => {
       cancelled = true;
+      if (timeoutId != null) clearTimeout(timeoutId);
     };
-  }, [auth.token]);
+  }, [auth.token, userCacheKey]);
 
+  // Debounced basket sync: one PUT per burst of changes (saves many requests)
   useEffect(() => {
     if (!auth.token || basketSyncSourceRef.current !== "local") return;
-    const items = Object.values(basket).map((item) => ({
-      productId: item.product.id,
-      quantity: item.quantity,
-    }));
-    putBasket(auth.token, items)
-      .then(() => {
-        basketSyncSourceRef.current = "api";
-      })
-      .catch(() => {
-        basketSyncSourceRef.current = "api";
-      });
-  }, [auth.token, basket]);
+    if (putBasketTimeoutRef.current) clearTimeout(putBasketTimeoutRef.current);
+    putBasketTimeoutRef.current = setTimeout(() => {
+      putBasketTimeoutRef.current = null;
+      const items = Object.values(basket).map((item) => ({
+        productId: item.product.id,
+        quantity: item.quantity,
+      }));
+      putBasket(auth.token!, items)
+        .then((next) => {
+          basketSyncSourceRef.current = "api";
+          setBasket(next);
+          const key = userCacheKey ? CACHE_KEYS.basket(userCacheKey) : null;
+          if (key) setCached(key, next, BASKET_CACHE_TTL_MS);
+        })
+        .catch(() => {
+          basketSyncSourceRef.current = "api";
+        });
+    }, 1500);
+    return () => {
+      if (putBasketTimeoutRef.current) {
+        clearTimeout(putBasketTimeoutRef.current);
+        putBasketTimeoutRef.current = null;
+      }
+    };
+  }, [auth.token, basket, userCacheKey]);
 
   const addToBasket = (product: Product) => {
     basketSyncSourceRef.current = "local";

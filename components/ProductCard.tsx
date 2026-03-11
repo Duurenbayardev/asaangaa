@@ -1,10 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { router } from "expo-router";
-import { useState } from "react";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { getCategoryLabel } from "../constants/categories";
 import { formatTugrug } from "../lib/formatCurrency";
-import { resolveImageUrl } from "../lib/api-client";
+import { useResolvedImageUri } from "../lib/imageSource";
 import { BasketItem, Product, useGrocery } from "../context/GroceryContext";
 
 const THEME_PRIMARY = "#8C1A7A";
@@ -15,20 +16,19 @@ type ProductCardProps = {
   variant?: "list" | "grid";
 };
 
-function productImageUri(product: Product): string | undefined {
-  const raw = product.images?.[0];
-  if (!raw?.trim()) return undefined;
-  return resolveImageUrl(raw) ?? (raw.startsWith("http") ? raw : undefined);
-}
-
 export function ProductCard({ product, basketItem, variant = "list" }: ProductCardProps) {
   const { toggleWishlist, wishlist } = useGrocery();
   const [imageError, setImageError] = useState(false);
+  const uri = useResolvedImageUri(product.images?.[0]) ?? undefined;
 
   const quantity = basketItem?.quantity ?? 0;
   const inWishlist = wishlist.has(product.id);
-  const uri = productImageUri(product);
   const showPlaceholder = !uri || imageError;
+
+  // Retry loading when product or image URL changes (e.g. after refresh or navigation)
+  useEffect(() => {
+    setImageError(false);
+  }, [product.id, uri]);
 
   const goToProduct = () =>
     router.push({ pathname: "/product/[id]", params: { id: product.id } });
@@ -45,7 +45,7 @@ export function ProductCard({ product, basketItem, variant = "list" }: ProductCa
             <Image
               source={{ uri }}
               style={styles.gridImage}
-              resizeMode="cover"
+              contentFit="cover"
               onError={() => setImageError(true)}
             />
           )}
@@ -81,7 +81,7 @@ export function ProductCard({ product, basketItem, variant = "list" }: ProductCa
           <Image
             source={{ uri: uri! }}
             style={styles.thumbnail}
-            resizeMode="cover"
+            contentFit="cover"
             onError={() => setImageError(true)}
           />
         )}

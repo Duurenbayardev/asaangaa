@@ -47,6 +47,15 @@ export default function Index() {
   const [loginImageReady, setLoginImageReady] = useState(false);
   const scrollRef = useRef<ScrollView | null>(null);
   const slideAnim = useRef(new Animated.Value(-SCREEN_HEIGHT)).current;
+  const slideFadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(slideFadeAnim, {
+      toValue: 1,
+      duration: 600,
+      useNativeDriver: true,
+    }).start();
+  }, [slideFadeAnim]);
 
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const next = Math.round(event.nativeEvent.contentOffset.x / width);
@@ -103,18 +112,19 @@ export default function Index() {
           scrollEventThrottle={16}
         >
           {SLIDES.map((slide) => (
-            <View key={slide.id} style={styles.slide}>
-              {slide.id === "welcome" && (
-                <Image
-                  source={require("../assets/logo.png")}
-                  style={styles.logo}
-                  resizeMode="contain"
-                />
-              )}
+            <Animated.View
+              key={slide.id}
+              style={[styles.slide, { opacity: slideFadeAnim }]}
+            >
+              <Image
+                source={require("../assets/logo.png")}
+                style={styles.logo}
+                resizeMode="contain"
+              />
               <Text style={styles.eyebrow}>{slide.eyebrow}</Text>
               <Text style={styles.title}>{slide.title}</Text>
               <Text style={styles.description}>{slide.description}</Text>
-            </View>
+            </Animated.View>
           ))}
         </ScrollView>
 

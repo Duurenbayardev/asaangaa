@@ -1,10 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Image } from "expo-image";
 import {
   ActivityIndicator,
   Dimensions,
-  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -19,7 +19,7 @@ import { VerificationBanner } from "../../components/VerificationBanner";
 import { getCategoryLabel } from "../../constants/categories";
 import { getUnitDisplayLabel } from "../../constants/units";
 import { formatTugrug } from "../../lib/formatCurrency";
-import { resolveImageUrl } from "../../lib/api-client";
+import { useResolvedImageUri } from "../../lib/imageSource";
 import { useGrocery } from "../../context/GroceryContext";
 
 const THEME_PRIMARY = "#8C1A7A";
@@ -30,6 +30,51 @@ function goBack() {
   } else {
     router.replace("/(tabs)/home");
   }
+}
+
+function ProductCarouselSlide({
+  src,
+  index,
+  imageLoaded,
+  imageError,
+  onLoad,
+  onError,
+  styles: s,
+}: {
+  src: string;
+  index: number;
+  imageLoaded: boolean;
+  imageError: boolean;
+  onLoad: (i: number) => void;
+  onError: (i: number) => void;
+  styles: { heroImageWrap: object; heroImage: object; imagePlaceholder: object };
+}) {
+  const uri = useResolvedImageUri(src) ?? undefined;
+  const loaded = imageLoaded;
+  const failed = imageError;
+  const showPlaceholder = !uri || failed || (uri && !loaded);
+  return (
+    <View style={s.heroImageWrap}>
+      {uri && !failed ? (
+        <Image
+          source={{ uri }}
+          style={s.heroImage}
+          contentFit="cover"
+          onLoad={() => onLoad(index)}
+          onError={() => onError(index)}
+        />
+      ) : null}
+      {showPlaceholder ? (
+        <View style={[StyleSheet.absoluteFill, s.imagePlaceholder]}>
+          {failed ? (
+            <Ionicons name="image-outline" size={48} color="#CCC" />
+          ) : (
+            <ActivityIndicator size="large" color={THEME_PRIMARY} />
+          )}
+        </View>
+      ) : null}
+    </View>
+  );
 }
 
 export default function ProductDetailScreen() {
@@ -50,6 +95,14 @@ export default function ProductDetailScreen() {
   const dismissToast = useCallback(() => setShowAddedToast(false), []);
   const [imageLoaded, setImageLoaded] = useState<Record<number, boolean>>({});
   const [imageError, setImageError] = useState<Record<number, boolean>>({});
+
+  // Reset image state when product or images change so we retry loading
+  useEffect(() => {
+    if (product?.id) {
+      setImageLoaded({});
+      setImageError({});
+    }
+  }, [product?.id, product?.images?.length]);
 
   const onHeroImageLoad = useCallback((index: number) => {
     setImageLoaded((prev) => ({ ...prev, [index]: true }));
@@ -106,6 +159,8 @@ export default function ProductDetailScreen() {
       </View>
     );
   }
+
+  if (!product) return null;
 
   const handleIncrement = () => {
     if (quantity === 0) {
@@ -164,33 +219,18 @@ export default function ProductDetailScreen() {
               <Ionicons name="image-outline" size={48} color="#CCC" />
             </View>
           ) : (
-            product.images.map((src, index) => {
-              const uri = resolveImageUrl(src) ?? (src.startsWith("http") ? src : undefined);
-              const loaded = imageLoaded[index];
-              const failed = imageError[index];
-              return (
-                <View key={index} style={styles.heroImageWrap}>
-                  {uri && !failed ? (
-                    <Image
-                      source={{ uri }}
-                      style={styles.heroImage}
-                      resizeMode="cover"
-                      onLoad={() => onHeroImageLoad(index)}
-                      onError={() => onHeroImageError(index)}
-                    />
-                  ) : null}
-                  {(!loaded && uri && !failed) || failed ? (
-                    <View style={[StyleSheet.absoluteFill, styles.imagePlaceholder]}>
-                      {failed ? (
-                        <Ionicons name="image-outline" size={48} color="#CCC" />
-                      ) : (
-                        <ActivityIndicator size="large" color={THEME_PRIMARY} />
-                      )}
-                    </View>
-                  ) : null}
-                </View>
-              );
-            })
+            product.images.map((src, index) => (
+              <ProductCarouselSlide
+                key={index}
+                src={src}
+                index={index}
+                imageLoaded={imageLoaded[index]}
+                imageError={imageError[index]}
+                onLoad={onHeroImageLoad}
+                onError={onHeroImageError}
+                styles={styles}
+              />
+            ))
           )}
         </ScrollView>
 

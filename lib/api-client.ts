@@ -10,7 +10,7 @@ type ExpoConstantsLike = {
   manifest2?: { extra?: Record<string, unknown> };
 };
 
-function getBaseUrl(): string {
+function readBaseUrlFromEnv(): string {
   try {
     const fromProcess = typeof process !== "undefined" && process.env?.EXPO_PUBLIC_API_URL;
     if (fromProcess && typeof process.env.EXPO_PUBLIC_API_URL === "string") {
@@ -30,23 +30,50 @@ function getBaseUrl(): string {
   return "https://asaangaa.onrender.com";
 }
 
-let baseUrl = getBaseUrl();
+// Resolved on first use so env/constants are ready when images resolve (fixes wrong base URL)
+let baseUrl: string | null = null;
+
+function getBaseUrl(): string {
+  if (baseUrl !== null) return baseUrl;
+  baseUrl = readBaseUrlFromEnv();
+  return baseUrl;
+}
 
 export function setApiBaseUrl(url: string) {
   baseUrl = url.replace(/\/$/, "");
 }
 
 export function getApiBaseUrl(): string {
-  return baseUrl;
+  return getBaseUrl();
 }
 
-/** Turn relative image paths (e.g. /uploads/xyz.jpg) into absolute URLs so they load from the API server. */
+/**
+ * Resolve image source to a URI the Image component can use.
+ * - data:image/...;base64,... → returned as-is (inline base64).
+ * - http(s)://... → returned as-is.
+ * - /uploads/... or uploads/... → absolute URL using API base.
+ */
 export function resolveImageUrl(url: string | undefined): string | undefined {
   if (!url?.trim()) return undefined;
   const u = url.trim();
+  if (u.startsWith("data:")) return u;
   if (u.startsWith("http://") || u.startsWith("https://")) return u;
-  const base = baseUrl.replace(/\/$/, "");
-  return u.startsWith("/") ? `${base}${u}` : `${base}/${u}`;
+  const base = getBaseUrl().replace(/\/$/, "");
+  const path = u.startsWith("/") ? u : `/${u}`;
+  return `${base}${path}`;
+}
+
+/**
+ * If the API returns raw base64 (no "data:" prefix), wrap it as a data URI.
+ * Use when product.images[] can be either paths or base64 strings.
+ */
+export function asImageSource(value: string | undefined): string | undefined {
+  if (!value?.trim()) return undefined;
+  const v = value.trim();
+  if (v.startsWith("data:") || v.startsWith("http://") || v.startsWith("https://") || v.startsWith("/")) {
+    return resolveImageUrl(v);
+  }
+  return `data:image/jpeg;base64,${v}`;
 }
 
 export type RequestConfig = RequestInit & {
@@ -54,7 +81,8 @@ export type RequestConfig = RequestInit & {
 };
 
 async function buildUrl(path: string, params?: Record<string, string | number | boolean | undefined>): Promise<string> {
-  const url = new URL(path.startsWith("http") ? path : `${baseUrl}${path.startsWith("/") ? path : `/${path}`}`);
+  const base = getBaseUrl();
+  const url = new URL(path.startsWith("http") ? path : `${base}${path.startsWith("/") ? path : `/${path}`}`);
   if (params) {
     Object.entries(params).forEach(([k, v]) => {
       if (v !== undefined) url.searchParams.set(k, String(v));
@@ -95,48 +123,106 @@ export async function parseJsonResponse(res: Response): Promise<unknown> {
   }
 }
 
+/** Max concurrent API requests to avoid overwhelming the server (e.g. Render rate limits). */
+const MAX_CONCURRENT_REQUESTS = 2;
+/** Retry up to this many times on 429 (rate limit) or 503 (cold start). */
+const MAX_RETRIES = 3;
+/** Initial backoff in ms; doubles each retry. */
+const RETRY_INITIAL_MS = 1000;
+
+let activeCount = 0;
+const queue: Array<() => void> = [];
+
+function runNextInQueue() {
+  if (activeCount >= MAX_CONCURRENT_REQUESTS || queue.length === 0) return;
+  activeCount++;
+  const next = queue.shift();
+  if (next) next();
+}
+
+function enqueue<T>(fn: () => Promise<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const run = () => {
+      fn()
+        .then(resolve)
+        .catch(reject)
+        .finally(() => {
+          activeCount--;
+          runNextInQueue();
+        });
+    };
+    if (activeCount < MAX_CONCURRENT_REQUESTS) {
+      activeCount++;
+      run();
+    } else {
+      queue.push(run);
+    }
+  });
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
 export async function apiRequest<T>(
   path: string,
   options: RequestConfig = {}
 ): Promise<T> {
-  const { params, ...init } = options;
-  const url = await buildUrl(path, params);
-  const headers: HeadersInit = {
-    "Content-Type": "application/json",
-    ...(init.headers as Record<string, string>),
-  };
-
-  let res: Response;
-  try {
-    res = await fetch(url, { ...init, headers });
-  } catch (e: unknown) {
-    const rawMessage =
-      e && typeof e === "object" && "message" in e
-        ? String((e as { message: string }).message)
-        : "Network request failed";
-    const message =
-      typeof __DEV__ !== "undefined" && __DEV__
-        ? `${rawMessage}. Tried: ${url}`
-        : rawMessage;
-    const err: ApiError = {
-      message,
-      code: "NETWORK_ERROR",
-      status: 0,
+  return enqueue(async () => {
+    const { params, ...init } = options;
+    const url = await buildUrl(path, params);
+    const headers: HeadersInit = {
+      "Content-Type": "application/json",
+      ...(init.headers as Record<string, string>),
     };
-    throw err;
-  }
-  const data = await parseJsonResponse(res);
 
-  if (!res.ok) {
-    const err: ApiError = {
-      message: (data as { message?: string }).message ?? res.statusText,
-      code: (data as { code?: string }).code,
-      status: res.status,
-    };
-    throw err;
-  }
+    let attempt = 0;
 
-  return data as T;
+    while (true) {
+      let res: Response;
+      try {
+        res = await fetch(url, { ...init, headers });
+      } catch (e: unknown) {
+        const rawMessage =
+          e && typeof e === "object" && "message" in e
+            ? String((e as { message: string }).message)
+            : "Network request failed";
+        const message =
+          typeof __DEV__ !== "undefined" && __DEV__
+            ? `${rawMessage}. Tried: ${url}`
+            : rawMessage;
+        const err: ApiError = {
+          message,
+          code: "NETWORK_ERROR",
+          status: 0,
+        };
+        throw err;
+      }
+
+      const data = await parseJsonResponse(res);
+
+      const rateLimited = res.status === 429 || res.status === 503;
+      const canRetry = rateLimited && attempt < MAX_RETRIES;
+
+      if (res.ok) {
+        return data as T;
+      }
+
+      if (canRetry) {
+        attempt++;
+        const backoffMs = RETRY_INITIAL_MS * Math.pow(2, attempt - 1);
+        await delay(backoffMs);
+        continue;
+      }
+
+      const err: ApiError = {
+        message: (data as { message?: string }).message ?? res.statusText,
+        code: (data as { code?: string }).code,
+        status: res.status,
+      };
+      throw err;
+    }
+  });
 }
 
 /** Attach auth token to requests. Call this after login. */
