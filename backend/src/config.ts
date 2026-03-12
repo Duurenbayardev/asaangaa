@@ -37,17 +37,18 @@ export const config = {
       : undefined,
   },
 
-  google: {
-    clientId: process.env.GOOGLE_CLIENT_ID ?? "",
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
-  },
-
   mail: {
     from: process.env.MAIL_FROM ?? "noreply@asaangaa.local",
     host: process.env.SMTP_HOST,
     port: process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : undefined,
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
+  },
+
+  firebase: {
+    projectId: process.env.FIREBASE_PROJECT_ID ?? "",
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL ?? "",
+    privateKey: (process.env.FIREBASE_PRIVATE_KEY ?? "").replace(/\\n/g, "\n"),
   },
 };
 

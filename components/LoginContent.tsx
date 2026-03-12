@@ -13,7 +13,6 @@ import {
   View,
 } from "react-native";
 import { useAuth } from "../context/AuthContext";
-import { signInWithGoogleAsync } from "../lib/google-auth";
 
 const THEME_PRIMARY = "#8C1A7A";
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -158,30 +157,6 @@ export function LoginContent({ onContinue, showHeader = false, onHeroImageLoad }
               </Text>
             )}
           </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.googleButton, auth.isLoading && styles.primaryButtonDisabled]}
-            onPress={async () => {
-              setError(null);
-              try {
-                const result = await signInWithGoogleAsync();
-                if (!result) {
-                  setError("Google нэвтрэлт тохируулаагүй эсвэл цуцлагдсан.");
-                  return;
-                }
-                await auth.loginWithGoogle(result.code, result.redirectUri, result.codeVerifier);
-                onContinue();
-              } catch (e: unknown) {
-                const msg = e && typeof e === "object" && "message" in e
-                  ? String((e as { message: string }).message)
-                  : "Google нэвтрэлт амжилтгүй. Дахин оролдоно уу.";
-                setError(msg);
-              }
-            }}
-            disabled={auth.isLoading}
-          >
-            <Text style={styles.googleButtonText}>Google-ээр нэвтрэх</Text>
-          </TouchableOpacity>
         </ScrollView>
       </View>
     </KeyboardAvoidingView>
@@ -298,19 +273,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: "#FFFFFF",
-  },
-  googleButton: {
-    marginTop: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#E1E1E1",
-    paddingVertical: 14,
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
-  },
-  googleButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#333333",
   },
 });

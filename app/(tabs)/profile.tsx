@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -12,15 +12,19 @@ import {
   View,
 } from "react-native";
 import { Header } from "../../components/Header";
-import { formatTugrug } from "../../lib/formatCurrency";
 import { useAuth } from "../../context/AuthContext";
 import { useGrocery } from "../../context/GroceryContext";
+import { formatTugrug } from "../../lib/formatCurrency";
 
 export default function ProfileScreen() {
-  const { user, sendOtp, verifyOtp, logout: authLogout, isLoading: authLoading } = useAuth();
+  const { user, sendPhoneOtp, verifyPhoneCode, logout: authLogout, isLoading: authLoading } = useAuth();
   const [otpSent, setOtpSent] = useState(false);
+  const [otpPhone, setOtpPhone] = useState(user?.phone ?? "");
   const [otpCode, setOtpCode] = useState("");
   const [otpError, setOtpError] = useState<string | null>(null);
+  useEffect(() => {
+    if (user?.phone) setOtpPhone(user.phone.replace(/\D/g, "").slice(-8));
+  }, [user?.phone]);
   const { addresses, basket, wishlist, total, userVerified } = useGrocery();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const displayName = user?.name?.trim() || user?.email?.split("@")[0] || "Зочлон худалдан авагч";
@@ -66,7 +70,7 @@ export default function ProfileScreen() {
           <View style={styles.statDivider} />
           <View style={styles.stat}>
             <Text style={styles.statValue}>{formatTugrug(total)}</Text>
-            <Text style={styles.statLabel}>Сагсын нийт</Text>
+            <Text style={styles.statLabel}>Сагсны нийт дүн</Text>
           </View>
         </View>
 
@@ -87,25 +91,38 @@ export default function ProfileScreen() {
             {!userVerified && user && (
               <View style={styles.otpBlock}>
                 {!otpSent ? (
-                  <TouchableOpacity
-                    style={[styles.verifyButton, authLoading && styles.verifyButtonDisabled]}
-                    onPress={async () => {
-                      setOtpError(null);
-                      try {
-                        await sendOtp();
-                        setOtpSent(true);
-                      } catch (e: unknown) {
-                        setOtpError(e && typeof e === "object" && "message" in e ? String((e as { message: string }).message) : "Код илгээхэд алдаа гарлаа.");
-                      }
-                    }}
-                    disabled={authLoading}
-                  >
-                    {authLoading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Ionicons name="mail-outline" size={20} color="#FFFFFF" />}
-                    <Text style={styles.verifyButtonText}>И-мэйл рүү OTP код илгээх</Text>
-                  </TouchableOpacity>
+                  <>
+                    <Text style={styles.otpHint}>Монгол утасны дугаараа оруулна уу (жишээ: 99123456)</Text>
+                    <TextInput
+                      style={styles.otpInput}
+                      placeholder="99123456"
+                      placeholderTextColor="#B0B0B0"
+                      value={otpPhone}
+                      onChangeText={(t) => { setOtpPhone(t.replace(/\D/g, "").slice(0, 11)); setOtpError(null); }}
+                      keyboardType="phone-pad"
+                      maxLength={11}
+                    />
+                    {otpError ? <Text style={styles.otpError}>{otpError}</Text> : null}
+                    <TouchableOpacity
+                      style={[styles.verifyButton, (authLoading || otpPhone.length < 8) && styles.verifyButtonDisabled]}
+                      onPress={async () => {
+                        setOtpError(null);
+                        try {
+                          await sendPhoneOtp(otpPhone);
+                          setOtpSent(true);
+                        } catch (e: unknown) {
+                          setOtpError(e && typeof e === "object" && "message" in e ? String((e as { message: string }).message) : "Код илгээхэд алдаа гарлаа.");
+                        }
+                      }}
+                      disabled={authLoading || otpPhone.length < 8}
+                    >
+                      {authLoading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Ionicons name="call-outline" size={20} color="#FFFFFF" />}
+                      <Text style={styles.verifyButtonText}>Утас руу OTP илгээх</Text>
+                    </TouchableOpacity>
+                  </>
                 ) : (
                   <>
-                    <Text style={styles.otpHint}>И-мэйлээр ирсэн 6 оронтой кодыг оруулна уу.</Text>
+                    <Text style={styles.otpHint}>Утасаар ирсэн 6 оронтой кодыг оруулна уу.</Text>
                     <TextInput
                       style={styles.otpInput}
                       placeholder="000000"
@@ -125,7 +142,7 @@ export default function ProfileScreen() {
                         onPress={async () => {
                           setOtpError(null);
                           try {
-                            await verifyOtp(otpCode);
+                            await verifyPhoneCode(otpCode);
                             setOtpSent(false);
                             setOtpCode("");
                           } catch (e: unknown) {
@@ -222,7 +239,7 @@ export default function ProfileScreen() {
           <View style={styles.card}>
             <View style={styles.cardRow}>
               <Ionicons name="cart-outline" size={20} color="#666666" />
-              <Text style={styles.cardLabel}>Сагсын тойм</Text>
+              <Text style={styles.cardLabel}>Сагсны мэдээлэл</Text>
               <Text style={styles.cardValue}>
                 {basketCount} ширхэг · {formatTugrug(total)}
               </Text>

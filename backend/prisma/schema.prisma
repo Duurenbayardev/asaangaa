@@ -13,6 +13,7 @@ model User {
   passwordHash  String?   @map("password_hash")
   googleId      String?   @unique @map("google_id")
   name          String?
+  phone         String?   @map("phone")
   role          String    @default("user")
   emailVerified Boolean   @default(false) @map("email_verified")
   createdAt     DateTime  @default(now()) @map("created_at")

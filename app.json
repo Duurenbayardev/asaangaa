@@ -9,9 +9,19 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.asaangaa.app",
+      "buildNumber": "1",
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Бүтээгдэхүүний зургийг сонгоход шаардлагатай.",
+        "NSCameraUsageDescription": "Бүтээгдэхүүний зургийг авахад шаардлагатай."
+      }
     },
     "android": {
+      "package": "com.asaangaa.app",
+      "versionCode": 1,
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -19,8 +29,7 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false,
-      "usesCleartextTraffic": true
+      "predictiveBackGestureEnabled": false
     },
     "web": {
       "output": "static",
@@ -38,6 +47,21 @@
           "dark": {
             "backgroundColor": "#000000"
           }
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Бүтээгдэхүүний зургийг сонгоход шаардлагатай.",
+          "cameraPermission": "Бүтээгдэхүүний зургийг авахад шаардлагатай."
+        }
+      ],
+      "@react-native-firebase/app",
+      "@react-native-firebase/auth",
+      [
+        "expo-build-properties",
+        {
+          "ios": { "useFrameworks": "static" }
         }
       ]
     ],

@@ -36,6 +36,10 @@ yarn-error.*
 backend/.env
 backend/uploads/
 
+# Store / EAS secrets (never commit)
+google-service-account.json
+*.keystore
+
 # typescript
 *.tsbuildinfo
 

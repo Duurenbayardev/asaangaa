@@ -29,29 +29,12 @@ export async function verifyEmail(token: string): Promise<User> {
   });
 }
 
-export async function loginWithGoogle(
-  code: string,
-  redirectUri?: string,
-  codeVerifier?: string
-): Promise<AuthTokens> {
-  return apiRequest<AuthTokens>("/auth/google", {
-    method: "POST",
-    body: JSON.stringify({ code, redirectUri, codeVerifier }),
-  });
-}
-
-export async function sendOtp(token: string): Promise<void> {
-  await apiRequest<{ message: string }>("/auth/send-otp", {
+/** Call after Firebase Phone Auth: send idToken from Firebase user to link phone to backend account. */
+export async function verifyPhone(token: string, idToken: string): Promise<User> {
+  return apiRequest<User>("/auth/verify-phone", {
     method: "POST",
     headers: getAuthHeaders(token),
-  });
-}
-
-export async function verifyOtp(token: string, code: string): Promise<User> {
-  return apiRequest<User>("/auth/verify-otp", {
-    method: "POST",
-    headers: getAuthHeaders(token),
-    body: JSON.stringify({ code }),
+    body: JSON.stringify({ idToken }),
   });
 }
 

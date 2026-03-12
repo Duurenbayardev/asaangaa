@@ -29,7 +29,7 @@ declare global {
     interface Request {
       userId?: string;
       userEmail?: string;
-      user?: { id: string; email: string; name: string | null; role: string; emailVerified: boolean; createdAt: Date };
+      user?: { id: string; email: string; name: string | null; phone: string | null; role: string; emailVerified: boolean; createdAt: Date };
     }
   }
 }
@@ -41,7 +41,7 @@ export async function requireUser(req: Request, res: Response, next: NextFunctio
   }
   const user = await prisma.user.findUnique({
     where: { id: req.userId },
-    select: { id: true, email: true, name: true, role: true, emailVerified: true, createdAt: true },
+    select: { id: true, email: true, name: true, phone: true, role: true, emailVerified: true, createdAt: true },
   });
   if (!user) {
     res.status(401).json({ message: "User not found", code: "UNAUTHORIZED" });
