@@ -1,6 +1,7 @@
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import {
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -8,15 +9,14 @@ import {
   View,
 } from "react-native";
 import { Header } from "../../components/Header";
-import { formatTugrug } from "../../lib/formatCurrency";
-import { ProductCard } from "../../components/ProductCard";
 import { VerificationBanner } from "../../components/VerificationBanner";
 import { useGrocery } from "../../context/GroceryContext";
+import { formatTugrug } from "../../lib/formatCurrency";
 
 const THEME_PRIMARY = "#8C1A7A";
 
 export default function BasketScreen() {
-  const { basket, setCheckoutItems, userVerified } = useGrocery();
+  const { basket, setCheckoutItems, updateQuantity, userVerified } = useGrocery();
   const [showVerificationBanner, setShowVerificationBanner] = useState(false);
 
   const items = useMemo(() => Object.values(basket), [basket]);
@@ -61,11 +61,60 @@ export default function BasketScreen() {
         showsVerticalScrollIndicator={false}
       >
         {items.map((item) => (
-          <ProductCard
-            key={item.product.id}
-            product={item.product}
-            basketItem={item}
-          />
+          <View key={item.product.id} style={styles.basketItemCard}>
+            <View style={styles.basketItemTopRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.basketItemName} numberOfLines={2}>
+                  {item.product.name}
+                </Text>
+                <Text style={styles.basketItemMeta}>
+                  {item.product.unit} · {formatTugrug(item.product.price)}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.removeButton}
+                onPress={() => {
+                  Alert.alert(
+                    "Та энэ барааг сагснаасаа хасах гэж байна.",
+                    `${item.product.name}`,
+                    [
+                      { text: "Цуцлах ", style: "cancel" },
+                      {
+                        text: "Хасах",
+                        style: "destructive",
+                        onPress: () => updateQuantity(item.product.id, 0),
+                      },
+                    ]
+                  );
+                }}
+              >
+                <Text style={styles.removeButtonText}>Хасах</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.basketItemBottomRow}>
+              <Text style={styles.lineTotal}>
+                {formatTugrug(item.product.price * item.quantity)}
+              </Text>
+              <View style={styles.qtyControls}>
+                <TouchableOpacity
+                  style={styles.qtyButton}
+                  onPress={() => updateQuantity(item.product.id, item.quantity - 1)}
+                >
+                  <Text style={styles.qtyButtonText}>−</Text>
+                </TouchableOpacity>
+                <Text style={styles.qtyValue}>{item.quantity}</Text>
+                <TouchableOpacity
+                  style={[styles.qtyButton, styles.qtyButtonPrimary]}
+                  onPress={() => updateQuantity(item.product.id, item.quantity + 1)}
+                >
+                  <Text style={[styles.qtyButtonText, styles.qtyButtonTextPrimary]}>
+                    +
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
         ))}
       </ScrollView>
 
@@ -105,6 +154,88 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 48,
+  },
+  basketItemCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#E5E5E5",
+    backgroundColor: "#FFFFFF",
+    padding: 14,
+    marginBottom: 12,
+  },
+  basketItemTopRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  basketItemName: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#111111",
+  },
+  basketItemMeta: {
+    marginTop: 4,
+    fontSize: 13,
+    color: "#777777",
+  },
+  removeButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#E8E8E8",
+    backgroundColor: "#FFFFFF",
+  },
+  removeButtonText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#B42318",
+  },
+  basketItemBottomRow: {
+    marginTop: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  lineTotal: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: THEME_PRIMARY,
+  },
+  qtyControls: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#E9E9E9",
+    borderRadius: 999,
+    overflow: "hidden",
+  },
+  qtyButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: "#FFFFFF",
+  },
+  qtyButtonPrimary: {
+    backgroundColor: "#F6EAF3",
+  },
+  qtyButtonText: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#444444",
+    minWidth: 14,
+    textAlign: "center",
+  },
+  qtyButtonTextPrimary: {
+    color: THEME_PRIMARY,
+  },
+  qtyValue: {
+    paddingHorizontal: 12,
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#111111",
+    minWidth: 24,
+    textAlign: "center",
   },
   heading: {
     fontSize: 20,

@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Image } from "expo-image";
 import {
   ActivityIndicator,
   Dimensions,
@@ -11,16 +11,16 @@ import {
   Text,
   View,
 } from "react-native";
-
-const CAROUSEL_ITEM_WIDTH = Dimensions.get("window").width - 40;
 import { AddedToBasketToast } from "../../components/AddedToBasketToast";
 import { Header } from "../../components/Header";
 import { VerificationBanner } from "../../components/VerificationBanner";
 import { getCategoryLabel } from "../../constants/categories";
 import { getUnitDisplayLabel } from "../../constants/units";
+import { useGrocery } from "../../context/GroceryContext";
 import { formatTugrug } from "../../lib/formatCurrency";
 import { useResolvedImageUri } from "../../lib/imageSource";
-import { useGrocery } from "../../context/GroceryContext";
+
+const CAROUSEL_ITEM_WIDTH = Dimensions.get("window").width;
 
 const THEME_PRIMARY = "#8C1A7A";
 
@@ -282,7 +282,7 @@ export default function ProductDetailScreen() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Энэ бүтээгдэхүүний тухай</Text>
-          <Text style={styles.body}>
+          <Text style={styles.sectionTitle2}>
             {product.description?.trim() || "Тайлбар оруулаагүй байна."}
           </Text>
         </View>
@@ -296,7 +296,7 @@ export default function ProductDetailScreen() {
           <Text style={styles.totalValue}>
             {quantity > 0
               ? formatTugrug(lineTotal)
-              : "Дор хаяж 1 ширхэг нэмнэ үү"}
+              : "-"}
           </Text>
         </View>
         <View style={styles.checkoutButtons}>
@@ -365,8 +365,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingHorizontal: 0,
     paddingBottom: 48,
   },
   imageCarousel: {
@@ -483,6 +482,13 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "600",
     color: "#111111",
+    paddingHorizontal: 20,
+    marginBottom: 8,
+  },
+  sectionTitle2: {
+    fontSize: 14,
+    color: "#555555",
+    paddingHorizontal: 20,
     marginBottom: 8,
   },
   body: {
