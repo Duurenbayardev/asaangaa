@@ -225,11 +225,11 @@ export default function CheckoutConfirmScreen() {
         <Text style={[styles.sectionTitle, styles.sectionSpacing]}>Төлбөрийн тойм</Text>
         <View style={styles.card}>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Дэд дүн</Text>
+            <Text style={styles.summaryLabel}>НӨАТ-гүй дүн</Text>
             <Text style={styles.summaryValue}>{formatTugrug(subtotal)}</Text>
           </View>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Татвар (10%)</Text>
+            <Text style={styles.summaryLabel}>НӨАТ (10%)</Text>
             <Text style={styles.summaryValue}>{formatTugrug(tax)}</Text>
           </View>
           <View style={styles.summaryRow}>

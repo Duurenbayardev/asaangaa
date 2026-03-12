@@ -132,7 +132,7 @@ export default function CheckoutAddressScreen() {
             <Text style={styles.formLabel}>Нэр</Text>
             <TextInput
               style={styles.input}
-              placeholder="Нэрээ оруулна уу"
+              placeholder="Бүтэн нэрээ оруулна уу"
               placeholderTextColor="#B0B0B0"
               value={fullName}
               onChangeText={setFullName}
@@ -140,14 +140,14 @@ export default function CheckoutAddressScreen() {
             <Text style={[styles.formLabel, styles.formLabelSpacing]}>Гэрийн хаяг *</Text>
             <TextInput
               style={styles.input}
-              placeholder="Байшин, гудамжны нэр"
+              placeholder="Хот, Аймаг"
               placeholderTextColor="#B0B0B0"
               value={line1}
               onChangeText={setLine1}
             />
             <TextInput
               style={[styles.input, styles.inputSpacing]}
-              placeholder="Талбай, давхар, орчны тэмдэг"
+              placeholder="Дүүрэг, баг"
               placeholderTextColor="#B0B0B0"
               value={line2}
               onChangeText={setLine2}
@@ -155,14 +155,14 @@ export default function CheckoutAddressScreen() {
             <View style={styles.row}>
               <TextInput
                 style={[styles.input, styles.halfInput]}
-                placeholder="Хот *"
+                placeholder="Хороо"
                 placeholderTextColor="#B0B0B0"
                 value={city}
                 onChangeText={setCity}
               />
               <TextInput
                 style={[styles.input, styles.halfInput]}
-                placeholder="Шуудангийн код"
+                placeholder="Хаалганы дугаар"
                 placeholderTextColor="#B0B0B0"
                 value={postalCode}
                 onChangeText={setPostalCode}
@@ -170,7 +170,7 @@ export default function CheckoutAddressScreen() {
             </View>
             <TextInput
               style={[styles.input, styles.inputSpacing]}
-              placeholder="Хүргэлтийн заавар"
+              placeholder="Нэмэлт мэдээлэл"
               placeholderTextColor="#B0B0B0"
               value={instructions}
               onChangeText={setInstructions}
