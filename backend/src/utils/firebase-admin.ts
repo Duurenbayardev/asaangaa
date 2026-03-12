@@ -28,7 +28,7 @@ function getApp(): admin.app.App {
 export interface DecodedFirebaseToken {
   uid: string;
   phone_number?: string;
-  firebase?: { sign_in_provider: string };
+  firebase?: { sign_in_provider?: string };
 }
 
 /**
@@ -40,6 +40,6 @@ export async function verifyFirebaseIdToken(idToken: string): Promise<DecodedFir
   return {
     uid: decoded.uid,
     phone_number: decoded.phone_number,
-    firebase: decoded.firebase as { sign_in_provider?: string } | undefined,
+    firebase: decoded.firebase as DecodedFirebaseToken["firebase"],
   };
 }
