@@ -5,7 +5,8 @@ import { validate } from "../middleware/validate";
 import { auth, requireUser } from "../middleware/auth";
 import { hashPassword } from "../utils/hash";
 import { signToken, getExpiresInSeconds } from "../utils/jwt";
-import { verifyFirebaseIdToken } from "../utils/firebase-admin";
+import { normalizeMongolianPhoneToE164, isValidE164 } from "../utils/phone";
+import { twilioSendOtp, twilioVerifyOtp } from "../utils/twilio-verify";
 
 const router = Router();
 
@@ -95,24 +96,55 @@ router.post("/verify-email", auth, requireUser, async (req, res, next) => {
   }
 });
 
-// ----- Phone verification (Firebase Auth – OTP sent by Firebase, free tier) -----
+// ----- Phone verification (Twilio Verify) -----
 router.post(
-  "/verify-phone",
+  "/send-otp",
   auth,
   requireUser,
-  validate([body("idToken").isString().notEmpty().withMessage("Firebase ID token required")]),
+  validate([body("phone").isString().notEmpty().withMessage("Phone number required")]),
   async (req, res, next) => {
     try {
-      const { idToken } = req.body as { idToken: string };
-      const decoded = await verifyFirebaseIdToken(idToken);
-      const phone = decoded.phone_number;
-      if (!phone) {
-        res.status(400).json({ message: "Token does not contain phone number", code: "INVALID_TOKEN" });
+      const { phone } = req.body as { phone: string };
+      const to = normalizeMongolianPhoneToE164(phone);
+      if (!isValidE164(to)) {
+        res.status(400).json({ message: "Invalid phone number", code: "INVALID_PHONE" });
+        return;
+      }
+      await twilioSendOtp(to);
+      // Persist phone on user so verify step can be only code-based (keeps frontend simple).
+      await prisma.user.update({
+        where: { id: req.userId! },
+        data: { phone: to },
+      });
+      res.json({ message: "OTP sent" });
+    } catch (e) {
+      next(e);
+    }
+  }
+);
+
+router.post(
+  "/verify-otp",
+  auth,
+  requireUser,
+  validate([body("code").isString().trim().isLength({ min: 4, max: 10 }).withMessage("Code required")]),
+  async (req, res, next) => {
+    try {
+      const { code } = req.body as { code: string };
+      const me = await prisma.user.findUnique({ where: { id: req.userId! } });
+      const to = me?.phone ?? "";
+      if (!to || !isValidE164(to)) {
+        res.status(400).json({ message: "No phone number on account. Send OTP first.", code: "NO_PHONE" });
+        return;
+      }
+      const ok = await twilioVerifyOtp(to, code);
+      if (!ok) {
+        res.status(400).json({ message: "Invalid code", code: "INVALID_CODE" });
         return;
       }
       const user = await prisma.user.update({
         where: { id: req.userId! },
-        data: { phone, emailVerified: true },
+        data: { emailVerified: true },
       });
       res.json(toUser(user));
     } catch (e) {

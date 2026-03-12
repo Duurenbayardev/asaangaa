@@ -29,12 +29,19 @@ export async function verifyEmail(token: string): Promise<User> {
   });
 }
 
-/** Call after Firebase Phone Auth: send idToken from Firebase user to link phone to backend account. */
-export async function verifyPhone(token: string, idToken: string): Promise<User> {
-  return apiRequest<User>("/auth/verify-phone", {
+export async function sendOtp(token: string, phone: string): Promise<void> {
+  await apiRequest<{ message: string }>("/auth/send-otp", {
     method: "POST",
     headers: getAuthHeaders(token),
-    body: JSON.stringify({ idToken }),
+    body: JSON.stringify({ phone: phone.trim() }),
+  });
+}
+
+export async function verifyOtp(token: string, code: string): Promise<User> {
+  return apiRequest<User>("/auth/verify-otp", {
+    method: "POST",
+    headers: getAuthHeaders(token),
+    body: JSON.stringify({ code }),
   });
 }
 

@@ -17,7 +17,7 @@ import { useGrocery } from "../../context/GroceryContext";
 import { formatTugrug } from "../../lib/formatCurrency";
 
 export default function ProfileScreen() {
-  const { user, sendPhoneOtp, verifyPhoneCode, logout: authLogout, isLoading: authLoading } = useAuth();
+  const { user, sendOtp, verifyOtp, logout: authLogout, isLoading: authLoading } = useAuth();
   const [otpSent, setOtpSent] = useState(false);
   const [otpPhone, setOtpPhone] = useState(user?.phone ?? "");
   const [otpCode, setOtpCode] = useState("");
@@ -108,7 +108,7 @@ export default function ProfileScreen() {
                       onPress={async () => {
                         setOtpError(null);
                         try {
-                          await sendPhoneOtp(otpPhone);
+                          await sendOtp(otpPhone);
                           setOtpSent(true);
                         } catch (e: unknown) {
                           setOtpError(e && typeof e === "object" && "message" in e ? String((e as { message: string }).message) : "Код илгээхэд алдаа гарлаа.");
@@ -142,7 +142,7 @@ export default function ProfileScreen() {
                         onPress={async () => {
                           setOtpError(null);
                           try {
-                            await verifyPhoneCode(otpCode);
+                            await verifyOtp(otpCode);
                             setOtpSent(false);
                             setOtpCode("");
                           } catch (e: unknown) {

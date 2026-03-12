@@ -1,9 +1,6 @@
-import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
-import type { FirebaseAuthTypes } from "@react-native-firebase/auth";
-import auth from "@react-native-firebase/auth";
+import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
 import type { User } from "../types/api";
 import * as authApi from "../lib/auth-api";
-import { toE164 } from "../lib/phone-utils";
 
 type AuthContextValue = {
   token: string | null;
@@ -11,8 +8,8 @@ type AuthContextValue = {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, name?: string) => Promise<void>;
-  sendPhoneOtp: (phone: string) => Promise<void>;
-  verifyPhoneCode: (code: string) => Promise<void>;
+  sendOtp: (phone: string) => Promise<void>;
+  verifyOtp: (code: string) => Promise<void>;
   verifyEmail: () => Promise<void>;
   logout: () => void;
   setToken: (t: string | null) => void;
@@ -26,7 +23,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setTokenState] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const phoneConfirmationRef = useRef<FirebaseAuthTypes.ConfirmationResult | null>(null);
 
   const setToken = useCallback((t: string | null) => {
     setTokenState(t);
@@ -55,30 +51,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const sendPhoneOtp = useCallback(async (phone: string) => {
+  const sendOtp = useCallback(async (phone: string) => {
     if (!token) return;
     setIsLoading(true);
     try {
-      const e164 = toE164(phone);
-      const confirmation = await auth().signInWithPhoneNumber(e164);
-      phoneConfirmationRef.current = confirmation;
+      await authApi.sendOtp(token, phone);
     } finally {
       setIsLoading(false);
     }
   }, [token]);
 
-  const verifyPhoneCode = useCallback(async (code: string) => {
+  const verifyOtp = useCallback(async (code: string) => {
     if (!token) return;
-    const conf = phoneConfirmationRef.current;
-    if (!conf) throw new Error("OTP not sent or expired. Send the code again.");
     setIsLoading(true);
     try {
-      const userCred = await conf.confirm(code);
-      const idToken = await userCred.user.getIdToken();
-      const updated = await authApi.verifyPhone(token, idToken);
+      const updated = await authApi.verifyOtp(token, code);
       setUser(updated);
-      phoneConfirmationRef.current = null;
-      await auth().signOut();
     } finally {
       setIsLoading(false);
     }
@@ -111,15 +99,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isLoading,
       login,
       signUp,
-      sendPhoneOtp,
-      verifyPhoneCode,
+      sendOtp,
+      verifyOtp,
       verifyEmail,
       logout,
       setToken,
       setUser,
       getAuthHeaders,
     }),
-    [token, user, isLoading, login, signUp, sendPhoneOtp, verifyPhoneCode, verifyEmail, logout, setToken, getAuthHeaders]
+    [token, user, isLoading, login, signUp, sendOtp, verifyOtp, verifyEmail, logout, setToken, getAuthHeaders]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

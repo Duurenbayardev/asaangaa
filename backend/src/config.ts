@@ -45,10 +45,10 @@ export const config = {
     pass: process.env.SMTP_PASS,
   },
 
-  firebase: {
-    projectId: process.env.FIREBASE_PROJECT_ID ?? "",
-    clientEmail: process.env.FIREBASE_CLIENT_EMAIL ?? "",
-    privateKey: (process.env.FIREBASE_PRIVATE_KEY ?? "").replace(/\\n/g, "\n"),
+  twilio: {
+    accountSid: process.env.TWILIO_ACCOUNT_SID ?? "",
+    authToken: process.env.TWILIO_AUTH_TOKEN ?? "",
+    verifyServiceSid: process.env.TWILIO_VERIFY_SERVICE_SID ?? "",
   },
 };
 
