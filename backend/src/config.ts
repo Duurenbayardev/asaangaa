@@ -52,11 +52,11 @@ export const config = {
   },
 
   qpay: {
-    baseUrl: process.env.QPAY_BASE_URL ?? "https://merchant-sandbox.qpay.mn",
-    clientId: process.env.QPAY_CLIENT_ID ?? "",
-    clientSecret: process.env.QPAY_CLIENT_SECRET ?? "",
-    invoiceCode: process.env.QPAY_INVOICE_CODE ?? "",
-    callbackBaseUrl: (process.env.QPAY_CALLBACK_BASE_URL ?? "").replace(/\/$/, ""),
+    baseUrl: (process.env.QPAY_BASE_URL ?? "https://merchant-sandbox.qpay.mn").trim(),
+    clientId: (process.env.QPAY_CLIENT_ID ?? "").trim(),
+    clientSecret: (process.env.QPAY_CLIENT_SECRET ?? "").trim(),
+    invoiceCode: (process.env.QPAY_INVOICE_CODE ?? "").trim(),
+    callbackBaseUrl: (process.env.QPAY_CALLBACK_BASE_URL ?? "").trim().replace(/\/$/, ""),
   },
 };
 

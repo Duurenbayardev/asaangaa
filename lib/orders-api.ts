@@ -77,3 +77,20 @@ export async function getOrder(token: string, orderId: string): Promise<Order | 
   }
   return data as Order;
 }
+
+export interface CheckPaymentResponse {
+  status: string;
+  paid: boolean;
+}
+
+export async function checkOrderPayment(
+  token: string,
+  orderId: string
+): Promise<CheckPaymentResponse> {
+  const res = await fetch(`${getApiBaseUrl()}/orders/${orderId}/check-payment`, {
+    headers: getAuthHeaders(token),
+  });
+  const data = await parseJsonResponse(res);
+  if (!res.ok) throw data;
+  return data as CheckPaymentResponse;
+}

@@ -20,7 +20,9 @@ async function readJsonOrText(res: Response): Promise<{ json: unknown | null; te
 function getBasicAuth(): string {
   const { clientId, clientSecret } = config.qpay;
   if (!clientId || !clientSecret) {
-    throw new Error("QPay credentials not configured (QPAY_CLIENT_ID, QPAY_CLIENT_SECRET)");
+    throw new Error(
+      "QPay credentials missing: set QPAY_CLIENT_ID and QPAY_CLIENT_SECRET in Render (Environment) and redeploy."
+    );
   }
   return Buffer.from(`${clientId}:${clientSecret}`, "utf8").toString("base64");
 }

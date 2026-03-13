@@ -360,6 +360,46 @@ router.get("/", async (req, res, next) => {
   }
 });
 
+router.get("/:id/check-payment", async (req, res, next) => {
+  try {
+    const order = await prisma.order.findFirst({
+      where: { id: req.params.id, userId: req.userId! },
+      include: { lines: true },
+    });
+    if (!order) {
+      res.status(404).json({ message: "Order not found", code: "NOT_FOUND" });
+      return;
+    }
+    if (order.status !== "pending_payment") {
+      res.json({ status: order.status, paid: order.status !== "pending_payment" });
+      return;
+    }
+    if (!order.qpayInvoiceId) {
+      res.status(400).json({ message: "No QPay invoice for this order", code: "NO_INVOICE" });
+      return;
+    }
+    const check = await checkPayment(order.qpayInvoiceId);
+    const paid = check.rows?.some((r) => r.payment_status === "PAID");
+    if (paid) {
+      const productIds = order.lines.map((l) => l.productId);
+      await prisma.$transaction([
+        prisma.order.update({
+          where: { id: order.id },
+          data: { status: "confirmed" },
+        }),
+        prisma.cartItem.deleteMany({
+          where: { userId: order.userId, productId: { in: productIds } },
+        }),
+      ]);
+      res.json({ status: "confirmed", paid: true });
+      return;
+    }
+    res.json({ status: "pending_payment", paid: false });
+  } catch (e) {
+    next(e);
+  }
+});
+
 router.get("/:id", async (req, res, next) => {
   try {
     const order = await prisma.order.findFirst({

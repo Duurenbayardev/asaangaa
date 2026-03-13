@@ -17,6 +17,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useGrocery } from "../../context/GroceryContext";
 import { formatTugrug } from "../../lib/formatCurrency";
 import {
+  checkOrderPayment,
   createOrderWithQPay,
   getOrder,
   type CreateOrderResponse,
@@ -24,6 +25,20 @@ import {
 } from "../../lib/orders-api";
 
 const THEME_PRIMARY = "#8C1A7A";
+
+// Bank logo: first letter(s) + color per bank name (no image assets)
+const BANK_COLORS = [
+  "#8C1A7A", "#1A5F7A", "#B23A48", "#2D6A4F", "#7B2CBF",
+  "#C77D1E", "#3D5A80", "#BC4749", "#6A4C93", "#2A9D8F",
+];
+function getBankLogo(name: string): { letter: string; color: string } {
+  const n = (name || "?").trim();
+  const letter = n.slice(0, 1).toUpperCase();
+  let hash = 0;
+  for (let i = 0; i < n.length; i++) hash = (hash << 5) - hash + n.charCodeAt(i);
+  const color = BANK_COLORS[Math.abs(hash) % BANK_COLORS.length];
+  return { letter, color };
+}
 
 function goBack() {
   if (router.canGoBack()) {
@@ -48,6 +63,7 @@ export default function CheckoutConfirmScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [phone, setPhone] = useState("");
   const [paymentState, setPaymentState] = useState<CreateOrderWithQPayResponse | null>(null);
+  const [checkingPayment, setCheckingPayment] = useState(false);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const { subtotal, tax, delivery, grandTotal, lines } = useMemo(() => {
@@ -148,6 +164,36 @@ export default function CheckoutConfirmScreen() {
     router.replace("/(tabs)/home");
   };
 
+  const handleCheckPayment = useCallback(async () => {
+    if (!token || !paymentState?.order.id || checkingPayment) return;
+    setCheckingPayment(true);
+    try {
+      const result = await checkOrderPayment(token, paymentState.order.id);
+      if (result.paid) {
+        if (pollingRef.current) {
+          clearInterval(pollingRef.current);
+          pollingRef.current = null;
+        }
+        const order = await getOrder(token, paymentState.order.id);
+        if (order) {
+          removeCheckoutItemsFromBasket(checkoutItems ?? []);
+          setCheckoutItems(null);
+          setCheckoutAddress(null);
+          setOrderResult(order as CreateOrderResponse);
+          setPaymentState(null);
+          setShowOrderSuccess(true);
+        }
+      } else {
+        Alert.alert("Төлбөр", "Төлбөр хараахан төлөгдөөгүй байна. Төлсний дараа дахин шалгана уу.");
+      }
+    } catch (e) {
+      const err = e as { message?: string };
+      Alert.alert("Алдаа", err?.message ?? "Төлбөр шалгахад алдаа гарлаа.");
+    } finally {
+      setCheckingPayment(false);
+    }
+  }, [token, paymentState?.order.id, checkingPayment, checkoutItems, removeCheckoutItemsFromBasket, setCheckoutItems, setCheckoutAddress]);
+
   if (paymentState) {
     const qrUri = paymentState.qPay.qrImage
       ? (paymentState.qPay.qrImage.startsWith("data:")
@@ -162,7 +208,7 @@ export default function CheckoutConfirmScreen() {
           contentContainerStyle={styles.paymentScrollContent}
           showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.paymentTitle}>Захиалга #${paymentState.order.id.slice(-8).toUpperCase()}</Text>
+          <Text style={styles.paymentTitle}>Захиалга #{paymentState.order.id.slice(-8).toUpperCase()}</Text>
           <Text style={styles.paymentSubtitle}>
             Нийт: {formatTugrug(paymentState.order.grandTotal)} — QR уншуулж эсвэл доорх банкнаас сонгоно уу.
           </Text>
@@ -172,17 +218,34 @@ export default function CheckoutConfirmScreen() {
             </View>
           ) : null}
           <Text style={styles.bankLinksTitle}>Банк / апп руу үсрэх</Text>
-          {paymentState.qPay.urls?.map((u, i) => (
-            <TouchableOpacity
-              key={i}
-              style={styles.bankLinkButton}
-              onPress={() => u.link && Linking.openURL(u.link)}
-            >
-              <Text style={styles.bankLinkText}>{u.name || u.description || "Төлөх"}</Text>
-              <Ionicons name="open-outline" size={18} color={THEME_PRIMARY} />
-            </TouchableOpacity>
-          ))}
-          <Text style={styles.paymentNote}>Төлбөр төлсний дараа захиалга автоматаар баталгаажина.</Text>
+          {paymentState.qPay.urls?.map((u, i) => {
+            const label = u.name || u.description || "Төлөх";
+            const logo = getBankLogo(label);
+            return (
+              <TouchableOpacity
+                key={i}
+                style={styles.bankLinkButton}
+                onPress={() => u.link && Linking.openURL(u.link)}
+              >
+                <View style={[styles.bankLogo, { backgroundColor: logo.color }]}>
+                  <Text style={styles.bankLogoLetter}>{logo.letter}</Text>
+                </View>
+                <Text style={styles.bankLinkText}>{label}</Text>
+                <Ionicons name="open-outline" size={18} color={THEME_PRIMARY} />
+              </TouchableOpacity>
+            );
+          })}
+          <TouchableOpacity
+            style={[styles.checkPaymentButton, checkingPayment && styles.checkPaymentButtonDisabled]}
+            onPress={checkingPayment ? undefined : handleCheckPayment}
+            disabled={checkingPayment}
+          >
+            <Ionicons name="card-outline" size={20} color="#FFFFFF" style={styles.checkPaymentIcon} />
+            <Text style={styles.checkPaymentButtonText}>
+              {checkingPayment ? "Шалгаж байна..." : "Төлбөр Шалгах"}
+            </Text>
+          </TouchableOpacity>
+          <Text style={styles.paymentNote}>Төлбөр төлсний дараа дээрх товч дарж шалгана уу.</Text>
         </ScrollView>
       </View>
     );
@@ -473,7 +536,6 @@ const styles = StyleSheet.create({
   bankLinkButton: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     paddingVertical: 14,
     paddingHorizontal: 16,
     backgroundColor: "#FFFFFF",
@@ -482,10 +544,45 @@ const styles = StyleSheet.create({
     borderColor: "#E5E5E5",
     marginBottom: 8,
   },
+  bankLogo: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  bankLogoLetter: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
   bankLinkText: {
+    flex: 1,
     fontSize: 15,
     fontWeight: "500",
     color: "#111111",
+  },
+  checkPaymentButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 20,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    backgroundColor: THEME_PRIMARY,
+  },
+  checkPaymentButtonDisabled: {
+    opacity: 0.7,
+  },
+  checkPaymentIcon: {
+    marginRight: 8,
+  },
+  checkPaymentButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#FFFFFF",
   },
   paymentNote: {
     fontSize: 13,
