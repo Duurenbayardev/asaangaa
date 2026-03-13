@@ -95,6 +95,7 @@ export interface Wishlist {
 
 export type OrderStatus =
   | "pending"
+  | "pending_payment"
   | "confirmed"
   | "processing"
   | "shipped"

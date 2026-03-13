@@ -13,6 +13,36 @@ export interface CreateOrderResponse {
   createdAt: string;
 }
 
+export interface QPayInvoiceUrl {
+  name: string;
+  description?: string;
+  link: string;
+}
+
+export interface CreateOrderWithQPayResponse {
+  order: CreateOrderResponse;
+  qPay: {
+    invoiceId: string;
+    qrImage: string;
+    qrText: string;
+    urls: QPayInvoiceUrl[];
+  };
+}
+
+export async function createOrderWithQPay(
+  token: string,
+  body: { addressId: string; phone: string; itemIds?: string[] }
+): Promise<CreateOrderWithQPayResponse> {
+  const res = await fetch(`${getApiBaseUrl()}/orders/create-with-qpay`, {
+    method: "POST",
+    headers: { ...getAuthHeaders(token), "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await parseJsonResponse(res);
+  if (!res.ok) throw data;
+  return data as CreateOrderWithQPayResponse;
+}
+
 export async function createOrder(
   token: string,
   body: { addressId: string; phone: string; itemIds?: string[] }

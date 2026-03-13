@@ -1,12 +1,27 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useMemo, useState } from "react";
-import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Alert,
+  Image,
+  Linking,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { Header } from "../../components/Header";
 import { useAuth } from "../../context/AuthContext";
 import { useGrocery } from "../../context/GroceryContext";
 import { formatTugrug } from "../../lib/formatCurrency";
-import { createOrder, type CreateOrderResponse } from "../../lib/orders-api";
+import {
+  createOrderWithQPay,
+  getOrder,
+  type CreateOrderResponse,
+  type CreateOrderWithQPayResponse,
+} from "../../lib/orders-api";
 
 const THEME_PRIMARY = "#8C1A7A";
 
@@ -32,6 +47,8 @@ export default function CheckoutConfirmScreen() {
   const [orderResult, setOrderResult] = useState<CreateOrderResponse | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [phone, setPhone] = useState("");
+  const [paymentState, setPaymentState] = useState<CreateOrderWithQPayResponse | null>(null);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const { subtotal, tax, delivery, grandTotal, lines } = useMemo(() => {
     if (!checkoutItems || checkoutItems.length === 0) {
@@ -82,27 +99,94 @@ export default function CheckoutConfirmScreen() {
     }
     setSubmitting(true);
     try {
-      const order = await createOrder(token, {
+      const result = await createOrderWithQPay(token, {
         addressId: checkoutAddress.id,
         phone: phoneTrim,
         itemIds: checkoutItems.map((i) => i.product.id),
       });
-      removeCheckoutItemsFromBasket(checkoutItems);
-      setCheckoutItems(null);
-      setCheckoutAddress(null);
-      setOrderResult(order);
-      setShowOrderSuccess(true);
+      setPaymentState(result);
     } catch (e: unknown) {
-      const message = e && typeof e === "object" && "message" in e ? String((e as { message: string }).message) : "Захиалга үүсгэхэд алдаа гарлаа.";
+      const err = e as { message?: string; code?: string };
+      const message =
+        err?.message ??
+        (err?.code === "QPAY_NOT_CONFIGURED"
+          ? "QPay тохиргоо хийгээгүй байна. Админтай холбогдоно уу."
+          : "Захиалга үүсгэхэд алдаа гарлаа.");
       Alert.alert("Алдаа", message);
     } finally {
       setSubmitting(false);
     }
   };
 
+  const checkOrderPaid = useCallback(async () => {
+    if (!token || !paymentState?.order.id) return;
+    const order = await getOrder(token, paymentState.order.id);
+    if (order && order.status !== "pending_payment") {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+      removeCheckoutItemsFromBasket(checkoutItems ?? []);
+      setCheckoutItems(null);
+      setCheckoutAddress(null);
+      setOrderResult(order as CreateOrderResponse);
+      setPaymentState(null);
+      setShowOrderSuccess(true);
+    }
+  }, [token, paymentState?.order.id, checkoutItems, removeCheckoutItemsFromBasket, setCheckoutItems, setCheckoutAddress]);
+
+  useEffect(() => {
+    if (!paymentState?.order.id || !token) return;
+    const id = setInterval(checkOrderPaid, 3000);
+    pollingRef.current = id;
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, [paymentState?.order.id, token, checkOrderPaid]);
+
   const handleSuccessDismiss = () => {
     router.replace("/(tabs)/home");
   };
+
+  if (paymentState) {
+    const qrUri = paymentState.qPay.qrImage
+      ? (paymentState.qPay.qrImage.startsWith("data:")
+          ? paymentState.qPay.qrImage
+          : `data:image/png;base64,${paymentState.qPay.qrImage}`)
+      : null;
+    return (
+      <View style={styles.container}>
+        <Header title="QPay төлбөр" />
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.paymentScrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <Text style={styles.paymentTitle}>Захиалга #${paymentState.order.id.slice(-8).toUpperCase()}</Text>
+          <Text style={styles.paymentSubtitle}>
+            Нийт: {formatTugrug(paymentState.order.grandTotal)} — QR уншуулж эсвэл доорх банкнаас сонгоно уу.
+          </Text>
+          {qrUri ? (
+            <View style={styles.qrWrap}>
+              <Image source={{ uri: qrUri }} style={styles.qrImage} resizeMode="contain" />
+            </View>
+          ) : null}
+          <Text style={styles.bankLinksTitle}>Банк / апп руу үсрэх</Text>
+          {paymentState.qPay.urls?.map((u, i) => (
+            <TouchableOpacity
+              key={i}
+              style={styles.bankLinkButton}
+              onPress={() => u.link && Linking.openURL(u.link)}
+            >
+              <Text style={styles.bankLinkText}>{u.name || u.description || "Төлөх"}</Text>
+              <Ionicons name="open-outline" size={18} color={THEME_PRIMARY} />
+            </TouchableOpacity>
+          ))}
+          <Text style={styles.paymentNote}>Төлбөр төлсний дараа захиалга автоматаар баталгаажина.</Text>
+        </ScrollView>
+      </View>
+    );
+  }
 
   if (showOrderSuccess) {
     const order = orderResult;
@@ -349,6 +433,64 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: 14,
     color: "#777777",
+    textAlign: "center",
+  },
+  paymentScrollContent: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 40,
+  },
+  paymentTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#111111",
+    marginBottom: 6,
+  },
+  paymentSubtitle: {
+    fontSize: 14,
+    color: "#666666",
+    marginBottom: 20,
+  },
+  qrWrap: {
+    alignSelf: "center",
+    padding: 16,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E5E5",
+    marginBottom: 24,
+  },
+  qrImage: {
+    width: 200,
+    height: 200,
+  },
+  bankLinksTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#111111",
+    marginBottom: 12,
+  },
+  bankLinkButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E5E5",
+    marginBottom: 8,
+  },
+  bankLinkText: {
+    fontSize: 15,
+    fontWeight: "500",
+    color: "#111111",
+  },
+  paymentNote: {
+    fontSize: 13,
+    color: "#888888",
+    marginTop: 20,
     textAlign: "center",
   },
   scroll: { flex: 1 },

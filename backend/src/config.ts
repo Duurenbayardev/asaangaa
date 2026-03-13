@@ -50,6 +50,14 @@ export const config = {
     authToken: process.env.TWILIO_AUTH_TOKEN ?? "",
     verifyServiceSid: process.env.TWILIO_VERIFY_SERVICE_SID ?? "",
   },
+
+  qpay: {
+    baseUrl: process.env.QPAY_BASE_URL ?? "https://merchant-sandbox.qpay.mn",
+    clientId: process.env.QPAY_CLIENT_ID ?? "",
+    clientSecret: process.env.QPAY_CLIENT_SECRET ?? "",
+    invoiceCode: process.env.QPAY_INVOICE_CODE ?? "",
+    callbackBaseUrl: (process.env.QPAY_CALLBACK_BASE_URL ?? "").replace(/\/$/, ""),
+  },
 };
 
 if (config.jwt.secret.length < 32 && config.isProduction) {

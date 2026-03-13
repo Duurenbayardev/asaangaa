@@ -105,19 +105,20 @@ model WishlistItem {
 }
 
 model Order {
-  id         String      @id @default(cuid())
-  userId     String      @map("user_id")
-  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  status     OrderStatus @default(pending)
-  addressId  String      @map("address_id")
-  address    Address     @relation(fields: [addressId], references: [id])
-  subtotal   Decimal     @db.Decimal(10, 2)
-  tax        Decimal     @db.Decimal(10, 2)
-  delivery   Decimal     @db.Decimal(10, 2)
-  grandTotal Decimal     @map("grand_total") @db.Decimal(10, 2)
-  addressSnapshot Json    @map("address_snapshot")
-  createdAt  DateTime    @default(now()) @map("created_at")
-  updatedAt  DateTime    @updatedAt @map("updated_at")
+  id              String       @id @default(cuid())
+  userId          String       @map("user_id")
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status          OrderStatus  @default(pending)
+  addressId       String       @map("address_id")
+  address         Address      @relation(fields: [addressId], references: [id])
+  subtotal        Decimal      @db.Decimal(10, 2)
+  tax             Decimal      @db.Decimal(10, 2)
+  delivery        Decimal      @db.Decimal(10, 2)
+  grandTotal      Decimal      @map("grand_total") @db.Decimal(10, 2)
+  addressSnapshot Json         @map("address_snapshot")
+  qpayInvoiceId   String?      @map("qpay_invoice_id")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
 
   lines OrderLine[]
 }
@@ -138,6 +139,7 @@ model OrderLine {
 
 enum OrderStatus {
   pending
+  pending_payment
   confirmed
   processing
   shipped
