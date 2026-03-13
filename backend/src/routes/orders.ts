@@ -147,13 +147,25 @@ router.post(
 
       const callbackBaseUrl = config.qpay.callbackBaseUrl;
       const callbackUrl = `${callbackBaseUrl}/orders/qpay-callback`;
-      const invoice = await createInvoice({
-        senderInvoiceNo: order.id,
-        invoiceReceiverCode: userId.slice(0, 45),
-        invoiceDescription: `Захиалга #${order.id.slice(-8).toUpperCase()}`,
-        amount: Number(order.grandTotal),
-        callbackUrl,
-      });
+      let invoice;
+      try {
+        invoice = await createInvoice({
+          senderInvoiceNo: order.id,
+          invoiceReceiverCode: userId.slice(0, 45),
+          invoiceDescription: `Захиалга #${order.id.slice(-8).toUpperCase()}`,
+          amount: Number(order.grandTotal),
+          callbackUrl,
+        });
+      } catch (qpayErr) {
+        const msg = qpayErr instanceof Error ? qpayErr.message : String(qpayErr);
+        console.error("[QPay createInvoice error]", msg);
+        res.status(502).json({
+          message: "Төлбөрийн сервис (QPay) одоогоор ажиллахгүй байна. Дахин оролдоно уу.",
+          code: "QPAY_ERROR",
+          detail: config.isProduction ? undefined : msg,
+        });
+        return;
+      }
 
       await prisma.order.update({
         where: { id: order.id },

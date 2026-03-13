@@ -8,6 +8,9 @@ export function errorHandler(
   _next: NextFunction
 ): void {
   const status = err.status ?? 500;
+  if (status >= 500) {
+    console.error("[server error]", err.message, err.stack ?? "");
+  }
   const message = status === 500 && config.isProduction ? "Internal server error" : err.message;
   const payload: Record<string, unknown> = { message };
   if (err.code) payload.code = err.code;
