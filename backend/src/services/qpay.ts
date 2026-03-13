@@ -7,6 +7,16 @@ import { config } from "../config";
 
 const BASE = config.qpay.baseUrl;
 
+async function readJsonOrText(res: Response): Promise<{ json: unknown | null; text: string }> {
+  const text = await res.text();
+  if (!text.trim()) return { json: null, text: "" };
+  try {
+    return { json: JSON.parse(text), text };
+  } catch {
+    return { json: null, text };
+  }
+}
+
 function getBasicAuth(): string {
   const { clientId, clientSecret } = config.qpay;
   if (!clientId || !clientSecret) {
@@ -35,9 +45,17 @@ export async function getAccessToken(): Promise<string> {
     },
     body: "{}",
   });
-  const data = (await res.json()) as QPayTokenResponse & { error?: string };
+  const parsed = await readJsonOrText(res);
+  const data = (parsed.json ?? {}) as Partial<QPayTokenResponse> & { error?: string; code?: string; message?: string };
   if (!res.ok || data.error) {
-    throw new Error(data.error ?? `QPay auth failed: ${res.status}`);
+    const code = data.code ?? data.error;
+    const msg = data.message ?? data.error ?? parsed.text?.slice(0, 300);
+    throw new Error(`QPay auth failed: ${res.status}${code ? ` code=${code}` : ""}${msg ? ` ${msg}` : ""}`);
+  }
+  if (!data.access_token) {
+    const code = (data as { code?: string }).code;
+    const msg = (data as { message?: string }).message ?? parsed.text?.slice(0, 300);
+    throw new Error(`QPay auth no token: ${res.status}${code ? ` code=${code}` : ""}${msg ? ` ${msg}` : ""}`);
   }
   const expiresIn = (data.expires_in ?? 3600) * 1000;
   cachedToken = {
@@ -90,12 +108,17 @@ export async function createInvoice(params: CreateInvoiceParams): Promise<Create
     },
     body: JSON.stringify(body),
   });
-  const data = (await res.json()) as CreateInvoiceResponse & { error?: string; message?: string };
+  const parsed = await readJsonOrText(res);
+  const data = (parsed.json ?? {}) as Partial<CreateInvoiceResponse> & { error?: string; code?: string; message?: string };
   if (!res.ok || data.error) {
-    throw new Error(data.message ?? data.error ?? `QPay create invoice failed: ${res.status}`);
+    const code = data.code ?? data.error;
+    const msg = data.message ?? data.error ?? parsed.text?.slice(0, 300);
+    throw new Error(`QPay create invoice failed: ${res.status}${code ? ` code=${code}` : ""}${msg ? ` ${msg}` : ""}`);
   }
   if (!data.invoice_id) {
-    throw new Error("QPay did not return invoice_id");
+    const code = (data as { code?: string }).code;
+    const msg = (data as { message?: string }).message ?? parsed.text?.slice(0, 300);
+    throw new Error(`QPay no invoice_id: ${res.status}${code ? ` code=${code}` : ""}${msg ? ` ${msg}` : ""}`);
   }
   return {
     invoice_id: data.invoice_id,
@@ -133,9 +156,12 @@ export async function checkPayment(invoiceId: string): Promise<PaymentCheckRespo
       offset: { page_number: 1, page_limit: 100 },
     }),
   });
-  const data = (await res.json()) as PaymentCheckResponse & { error?: string };
+  const parsed = await readJsonOrText(res);
+  const data = (parsed.json ?? {}) as Partial<PaymentCheckResponse> & { error?: string; code?: string; message?: string };
   if (!res.ok) {
-    throw new Error(data.error ?? `QPay payment check failed: ${res.status}`);
+    const code = data.code ?? data.error;
+    const msg = data.message ?? data.error ?? parsed.text?.slice(0, 300);
+    throw new Error(`QPay payment check failed: ${res.status}${code ? ` code=${code}` : ""}${msg ? ` ${msg}` : ""}`);
   }
   return {
     count: data.count ?? 0,
