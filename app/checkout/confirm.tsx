@@ -26,12 +26,52 @@ import {
 
 const THEME_PRIMARY = "#8C1A7A";
 
-// Bank logo: first letter(s) + color per bank name (no image assets)
+// Real bank logo URLs (Clearbit logo API by domain; fallback to letter if load fails)
+const BANK_LOGO_DOMAINS: Record<string, string> = {
+  "khan bank": "khanbank.com",
+  "khanbank": "khanbank.com",
+  "state bank": "statebank.mn",
+  "statebank": "statebank.mn",
+  "төрийн банк": "statebank.mn",
+  "xac bank": "xacbank.mn",
+  "xacbank": "xacbank.mn",
+  "хас банк": "xacbank.mn",
+  "trade and development bank": "tdbbank.mn",
+  "tdb": "tdbbank.mn",
+  "tdbbank": "tdbbank.mn",
+  "most money": "most.mn",
+  "most": "most.mn",
+  "мост мони": "most.mn",
+  "national investment bank": "nibank.mn",
+  "nibank": "nibank.mn",
+  "chinggis khaan bank": "ckbank.mn",
+  "chinggis": "ckbank.mn",
+  "чингис хаан банк": "ckbank.mn",
+  "capitron bank": "capitronbank.mn",
+  "capitron": "capitronbank.mn",
+  "богд банк": "bogdbank.mn",
+  "bogd bank": "bogdbank.mn",
+  "bogdbank": "bogdbank.mn",
+  "candy pay": "candypay.mn",
+  "мон пэй": "candypay.mn",
+};
+
 const BANK_COLORS = [
   "#8C1A7A", "#1A5F7A", "#B23A48", "#2D6A4F", "#7B2CBF",
   "#C77D1E", "#3D5A80", "#BC4749", "#6A4C93", "#2A9D8F",
 ];
-function getBankLogo(name: string): { letter: string; color: string } {
+
+function getBankLogoUrl(name: string): string | null {
+  const key = (name || "").toLowerCase().trim();
+  const domain =
+    BANK_LOGO_DOMAINS[key] ??
+    BANK_LOGO_DOMAINS[Object.keys(BANK_LOGO_DOMAINS).find((k) => key.includes(k) || k.includes(key)) ?? ""];
+  if (!domain) return null;
+  // Prefer Clearbit logo; fallback to Google favicon (often works for regional banks)
+  return `https://logo.clearbit.com/${domain}`;
+}
+
+function getBankLetterFallback(name: string): { letter: string; color: string } {
   const n = (name || "?").trim();
   const letter = n.slice(0, 1).toUpperCase();
   let hash = 0;
@@ -46,6 +86,27 @@ function goBack() {
   } else {
     router.replace("/(tabs)/home");
   }
+}
+
+function BankLogo({ name, style }: { name: string; style?: object }) {
+  const [failed, setFailed] = useState(false);
+  const logoUrl = getBankLogoUrl(name);
+  const fallback = getBankLetterFallback(name);
+  if (!logoUrl || failed) {
+    return (
+      <View style={[styles.bankLogo, { backgroundColor: fallback.color }, style]}>
+        <Text style={styles.bankLogoLetter}>{fallback.letter}</Text>
+      </View>
+    );
+  }
+  return (
+    <Image
+      source={{ uri: logoUrl }}
+      style={[styles.bankLogoImage, style]}
+      resizeMode="contain"
+      onError={() => setFailed(true)}
+    />
+  );
 }
 
 export default function CheckoutConfirmScreen() {
@@ -220,21 +281,19 @@ export default function CheckoutConfirmScreen() {
           <Text style={styles.bankLinksTitle}>Банк / апп руу үсрэх</Text>
           {paymentState.qPay.urls?.map((u, i) => {
             const label = u.name || u.description || "Төлөх";
-            const logo = getBankLogo(label);
             return (
               <TouchableOpacity
                 key={i}
                 style={styles.bankLinkButton}
                 onPress={() => u.link && Linking.openURL(u.link)}
               >
-                <View style={[styles.bankLogo, { backgroundColor: logo.color }]}>
-                  <Text style={styles.bankLogoLetter}>{logo.letter}</Text>
-                </View>
+                <BankLogo name={label} />
                 <Text style={styles.bankLinkText}>{label}</Text>
                 <Ionicons name="open-outline" size={18} color={THEME_PRIMARY} />
               </TouchableOpacity>
             );
           })}
+          <Text style={styles.paymentNote}>Төлбөр төлсний дараа доорх товч дарж шалгана уу.</Text>
           <TouchableOpacity
             style={[styles.checkPaymentButton, checkingPayment && styles.checkPaymentButtonDisabled]}
             onPress={checkingPayment ? undefined : handleCheckPayment}
@@ -245,7 +304,6 @@ export default function CheckoutConfirmScreen() {
               {checkingPayment ? "Шалгаж байна..." : "Төлбөр Шалгах"}
             </Text>
           </TouchableOpacity>
-          <Text style={styles.paymentNote}>Төлбөр төлсний дараа дээрх товч дарж шалгана уу.</Text>
         </ScrollView>
       </View>
     );
@@ -557,6 +615,13 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#FFFFFF",
   },
+  bankLogoImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 12,
+    backgroundColor: "#F0F0F0",
+  },
   bankLinkText: {
     flex: 1,
     fontSize: 15,
@@ -567,7 +632,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 20,
+    marginTop: 24,
     paddingVertical: 14,
     paddingHorizontal: 24,
     borderRadius: 12,
