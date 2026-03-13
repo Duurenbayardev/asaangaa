@@ -17,6 +17,11 @@ import adminRoutes from "./routes/admin";
 
 const app = express();
 
+// Required when behind a proxy (e.g. Render, nginx) so rate-limit can use X-Forwarded-For
+if (config.isProduction) {
+  app.set("trust proxy", 1);
+}
+
 app.use(helmet({
   contentSecurityPolicy: config.isProduction,
   crossOriginResourcePolicy: { policy: "cross-origin" },
