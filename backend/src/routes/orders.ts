@@ -29,7 +29,7 @@ router.post("/qpay-callback", async (req, res, next) => {
       res.status(404).json({ error: "Order not found for invoice" });
       return;
     }
-    if (order.status !== "pending_payment") {
+    if ((order.status as string) !== "pending_payment") {
       res.json({ ok: true, status: order.status });
       return;
     }
@@ -370,8 +370,9 @@ router.get("/:id/check-payment", async (req, res, next) => {
       res.status(404).json({ message: "Order not found", code: "NOT_FOUND" });
       return;
     }
-    if (order.status !== "pending_payment") {
-      res.json({ status: order.status, paid: order.status !== "pending_payment" });
+    const status = order.status as string;
+    if (status !== "pending_payment") {
+      res.json({ status: order.status, paid: status !== "pending_payment" });
       return;
     }
     if (!order.qpayInvoiceId) {
