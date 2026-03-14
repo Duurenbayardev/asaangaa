@@ -2,32 +2,23 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
   Image,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
-import { Header } from "../../components/Header";
+import { AppHeader } from "../../components/AppHeader";
 import { useAuth } from "../../context/AuthContext";
 import { useGrocery } from "../../context/GroceryContext";
 import { formatTugrug } from "../../lib/formatCurrency";
 
 export default function ProfileScreen() {
-  const { user, sendOtp, verifyOtp, logout: authLogout, isLoading: authLoading } = useAuth();
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpPhone, setOtpPhone] = useState(user?.phone ?? "");
-  const [otpCode, setOtpCode] = useState("");
-  const [otpError, setOtpError] = useState<string | null>(null);
-  useEffect(() => {
-    if (user?.phone) setOtpPhone(user.phone.replace(/\D/g, "").slice(-8));
-  }, [user?.phone]);
+  const { user, token, isRestored, logout: authLogout } = useAuth();
   const { addresses, basket, wishlist, total, userVerified } = useGrocery();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const displayName = user?.name?.trim() || user?.email?.split("@")[0] || "Зочлон худалдан авагч";
+  const displayName = user?.name?.trim() || user?.phone || "Зочлон худалдан авагч";
 
   const basketCount = Object.values(basket).reduce((s, i) => s + i.quantity, 0);
   const wishlistCount = wishlist.size;
@@ -35,12 +26,42 @@ export default function ProfileScreen() {
   const handleLogoutConfirm = () => {
     setShowLogoutConfirm(false);
     authLogout();
-    router.replace("/");
+    router.replace("/?showLogin=1");
   };
+
+  if (isRestored && !token) {
+    return (
+      <View style={styles.container}>
+        <AppHeader />
+        <ScrollView
+          contentContainerStyle={[styles.scroll, styles.guestScroll]}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.avatarSection}>
+            <View style={styles.avatarRing}>
+              <Image
+                source={require("../../assets/logo.png")}
+                style={styles.avatar}
+                resizeMode="contain"
+              />
+            </View>
+            <Text style={styles.userName}>Зочлон худалдан авагч</Text>
+            <Text style={styles.userMeta}>Нэвтрэхээр захиалга, хаяг хадгалах боломжтой</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.loginCtaButton}
+            onPress={() => router.replace("/?showLogin=1")}
+          >
+            <Text style={styles.loginCtaButtonText}>Нэвтрэх</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      <Header title="Профайл" />
+      <AppHeader />
       <ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
@@ -54,7 +75,7 @@ export default function ProfileScreen() {
             />
           </View>
           <Text style={styles.userName}>{displayName}</Text>
-          <Text style={styles.userMeta}>{user ? user.email : "Нэвтрээгүй"}</Text>
+          <Text style={styles.userMeta}>{user?.phone ?? "Нэвтрээгүй"}</Text>
         </View>
 
         <View style={styles.statsRow}>
@@ -83,82 +104,11 @@ export default function ProfileScreen() {
                 size={20}
                 color={userVerified ? "#2E7D32" : "#666666"}
               />
-              <Text style={styles.cardLabel}>Худалдан авалтын баталгаажуулалт</Text>
+              <Text style={styles.cardLabel}>Утасны дугаар баталгаажсан</Text>
               <Text style={[styles.cardValue, !userVerified && styles.cardValueMuted]}>
                 {userVerified ? "Баталгаажсан" : "Баталгаажаагүй"}
               </Text>
             </View>
-            {!userVerified && user && (
-              <View style={styles.otpBlock}>
-                {!otpSent ? (
-                  <>
-                    <Text style={styles.otpHint}>Монгол утасны дугаараа оруулна уу (жишээ: 99123456)</Text>
-                    <TextInput
-                      style={styles.otpInput}
-                      placeholder="99123456"
-                      placeholderTextColor="#B0B0B0"
-                      value={otpPhone}
-                      onChangeText={(t) => { setOtpPhone(t.replace(/\D/g, "").slice(0, 11)); setOtpError(null); }}
-                      keyboardType="phone-pad"
-                      maxLength={11}
-                    />
-                    {otpError ? <Text style={styles.otpError}>{otpError}</Text> : null}
-                    <TouchableOpacity
-                      style={[styles.verifyButton, (authLoading || otpPhone.length < 8) && styles.verifyButtonDisabled]}
-                      onPress={async () => {
-                        setOtpError(null);
-                        try {
-                          await sendOtp(otpPhone);
-                          setOtpSent(true);
-                        } catch (e: unknown) {
-                          setOtpError(e && typeof e === "object" && "message" in e ? String((e as { message: string }).message) : "Код илгээхэд алдаа гарлаа.");
-                        }
-                      }}
-                      disabled={authLoading || otpPhone.length < 8}
-                    >
-                      {authLoading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Ionicons name="call-outline" size={20} color="#FFFFFF" />}
-                      <Text style={styles.verifyButtonText}>Утас руу OTP илгээх</Text>
-                    </TouchableOpacity>
-                  </>
-                ) : (
-                  <>
-                    <Text style={styles.otpHint}>Утасаар ирсэн 6 оронтой кодыг оруулна уу.</Text>
-                    <TextInput
-                      style={styles.otpInput}
-                      placeholder="000000"
-                      placeholderTextColor="#B0B0B0"
-                      value={otpCode}
-                      onChangeText={(t) => { setOtpCode(t.replace(/\D/g, "").slice(0, 6)); setOtpError(null); }}
-                      keyboardType="number-pad"
-                      maxLength={6}
-                    />
-                    {otpError ? <Text style={styles.otpError}>{otpError}</Text> : null}
-                    <View style={styles.otpRow}>
-                      <TouchableOpacity style={styles.otpSecondaryBtn} onPress={() => { setOtpSent(false); setOtpCode(""); setOtpError(null); }}>
-                        <Text style={styles.otpSecondaryText}>Буцах</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.verifyButton, (authLoading || otpCode.length !== 6) && styles.verifyButtonDisabled]}
-                        onPress={async () => {
-                          setOtpError(null);
-                          try {
-                            await verifyOtp(otpCode);
-                            setOtpSent(false);
-                            setOtpCode("");
-                          } catch (e: unknown) {
-                            setOtpError(e && typeof e === "object" && "message" in e ? String((e as { message: string }).message) : "Код буруу байна.");
-                          }
-                        }}
-                        disabled={authLoading || otpCode.length !== 6}
-                      >
-                        {authLoading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" />}
-                        <Text style={styles.verifyButtonText}>Баталгаажуулах</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </>
-                )}
-              </View>
-            )}
           </View>
         </View>
 
@@ -290,7 +240,25 @@ const styles = StyleSheet.create({
   },
   scroll: {
     paddingHorizontal: 20,
-    paddingTop: 8,
+    paddingTop: 16,
+  },
+  guestScroll: {
+    flexGrow: 1,
+    justifyContent: "center",
+    paddingTop: 48,
+  },
+  loginCtaButton: {
+    marginHorizontal: 20,
+    marginTop: 24,
+    paddingVertical: 16,
+    borderRadius: 14,
+    backgroundColor: "#8C1A7A",
+    alignItems: "center",
+  },
+  loginCtaButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#FFFFFF",
   },
   avatarSection: {
     alignItems: "center",
@@ -462,6 +430,7 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 12,
     paddingVertical: 12,
+    paddingHorizontal: 16,
     borderRadius: 12,
     backgroundColor: "#2E7D32",
   },

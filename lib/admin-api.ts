@@ -138,7 +138,7 @@ export async function ocrImage(token: string, image: { uri: string; type?: strin
 export interface AdminOrder {
   id: string;
   userId: string;
-  userEmail: string;
+  userPhone?: string;
   userName: string | null;
   status: string;
   lines: { productId: string; productName: string; quantity: number; unitPrice: number; total: number }[];

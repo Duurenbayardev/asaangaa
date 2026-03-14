@@ -1,10 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
+import Constants from "expo-constants";
 import { router } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Image,
   Linking,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,7 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { Header } from "../../components/Header";
+import { BackButton } from "../../components/BackButton";
 import { useAuth } from "../../context/AuthContext";
 import { useGrocery } from "../../context/GroceryContext";
 import { formatTugrug } from "../../lib/formatCurrency";
@@ -26,91 +28,157 @@ import {
 
 const THEME_PRIMARY = "#8C1A7A";
 
-// Real bank logo URLs (Clearbit logo API by domain; fallback to letter if load fails)
-const BANK_LOGO_DOMAINS: Record<string, string> = {
+// Logo.dev: bank name → domain for logo lookup (only publishable key in app; secret key is server-side only)
+function getLogoDevPublishableKey(): string {
+  try {
+    const fromProcess =
+      typeof process !== "undefined" && (process as unknown as { env?: Record<string, string> }).env?.EXPO_PUBLIC_LOGO_DEV_PUBLISHABLE_KEY;
+    if (typeof fromProcess === "string" && fromProcess) return fromProcess;
+    const extra = (Constants.expoConfig?.extra ?? Constants.manifest2?.extra) as Record<string, unknown> | undefined;
+    const fromExtra = extra?.EXPO_PUBLIC_LOGO_DEV_PUBLISHABLE_KEY;
+    if (typeof fromExtra === "string" && fromExtra) return fromExtra;
+  } catch (_) {}
+  return "";
+}
+
+// Bank name (various labels) → domain for Logo.dev
+const BANK_DOMAINS: Record<string, string> = {
   "khan bank": "khanbank.com",
-  "khanbank": "khanbank.com",
+  khanbank: "khanbank.com",
   "state bank": "statebank.mn",
-  "statebank": "statebank.mn",
+  statebank: "statebank.mn",
   "төрийн банк": "statebank.mn",
   "xac bank": "xacbank.mn",
-  "xacbank": "xacbank.mn",
+  xacbank: "xacbank.mn",
   "хас банк": "xacbank.mn",
-  "trade and development bank": "tdbbank.mn",
-  "tdb": "tdbbank.mn",
-  "tdbbank": "tdbbank.mn",
+  "trade and development bank": "tdbm.mn",
+  tdb: "tdbm.mn",
+  tdbbank: "tdbm.mn",
   "most money": "most.mn",
-  "most": "most.mn",
+  most: "most.mn",
   "мост мони": "most.mn",
   "national investment bank": "nibank.mn",
-  "nibank": "nibank.mn",
-  "chinggis khaan bank": "ckbank.mn",
-  "chinggis": "ckbank.mn",
-  "чингис хаан банк": "ckbank.mn",
-  "capitron bank": "capitronbank.mn",
-  "capitron": "capitronbank.mn",
-  "богд банк": "bogdbank.mn",
+  nibank: "nibank.mn",
+  "chinggis khaan bank": "ckb.mn",
+  chinggis: "ckb.mn",
+  "чингис хаан банк": "ckb.mn",
+  "capitron bank": "capitron.mn",
+  capitron: "capitron.mn",
   "bogd bank": "bogdbank.mn",
-  "bogdbank": "bogdbank.mn",
-  "candy pay": "candypay.mn",
-  "мон пэй": "candypay.mn",
+  bogdbank: "bogdbank.mn",
+  "богд банк": "bogdbank.mn",
+  "candy pay": "monpay.mn",
+  "мон пэй": "monpay.mn",
+  monpay: "monpay.mn",
 };
 
-const BANK_COLORS = [
-  "#8C1A7A", "#1A5F7A", "#B23A48", "#2D6A4F", "#7B2CBF",
-  "#C77D1E", "#3D5A80", "#BC4749", "#6A4C93", "#2A9D8F",
-];
-
-function getBankLogoUrl(name: string): string | null {
+function getBankDomain(name: string): string | null {
   const key = (name || "").toLowerCase().trim();
-  const domain =
-    BANK_LOGO_DOMAINS[key] ??
-    BANK_LOGO_DOMAINS[Object.keys(BANK_LOGO_DOMAINS).find((k) => key.includes(k) || k.includes(key)) ?? ""];
-  if (!domain) return null;
-  // Prefer Clearbit logo; fallback to Google favicon (often works for regional banks)
-  return `https://logo.clearbit.com/${domain}`;
+  if (BANK_DOMAINS[key]) return BANK_DOMAINS[key];
+  const match = Object.keys(BANK_DOMAINS).find((k) => key.includes(k) || k.includes(key));
+  return match ? BANK_DOMAINS[match] : null;
 }
 
-function getBankLetterFallback(name: string): { letter: string; color: string } {
-  const n = (name || "?").trim();
-  const letter = n.slice(0, 1).toUpperCase();
+// Domain → Mongolian display name for bank/app labels
+const BANK_MONGOLIAN_NAMES: Record<string, string> = {
+  "khanbank.com": "Хан банк",
+  "statebank.mn": "Төрийн банк",
+  "xacbank.mn": "Хас банк",
+  "tdbm.mn": "Хөгжлийн банк",
+  "most.mn": "Мост Мони",
+  "nibank.mn": "Хөрөнгө оруулалтын банк",
+  "ckb.mn": "Чингис Хаан банк",
+  "capitron.mn": "Капитрон банк",
+  "bogdbank.mn": "Богд банк",
+  "monpay.mn": "Мон Пэй",
+};
+
+function getBankMongolianName(apiLabel: string): string {
+  const domain = getBankDomain(apiLabel);
+  if (domain && BANK_MONGOLIAN_NAMES[domain]) return BANK_MONGOLIAN_NAMES[domain];
+  return apiLabel;
+}
+
+// Curated bank badges: fallback initials + color when Logo.dev has no logo
+const BANK_BADGES: Record<string, { abbr: string; color: string }> = {
+  "khan bank": { abbr: "KH", color: "#0D47A1" },
+  "khanbank": { abbr: "KH", color: "#0D47A1" },
+  "state bank": { abbr: "SB", color: "#1B5E20" },
+  "statebank": { abbr: "SB", color: "#1B5E20" },
+  "төрийн банк": { abbr: "SB", color: "#1B5E20" },
+  "xac bank": { abbr: "XB", color: "#B71C1C" },
+  "xacbank": { abbr: "XB", color: "#B71C1C" },
+  "хас банк": { abbr: "XB", color: "#B71C1C" },
+  "trade and development bank": { abbr: "TDB", color: "#004D40" },
+  "tdb": { abbr: "TDB", color: "#004D40" },
+  "tdbbank": { abbr: "TDB", color: "#004D40" },
+  "most money": { abbr: "MO", color: "#E65100" },
+  "most": { abbr: "MO", color: "#E65100" },
+  "мост мони": { abbr: "MO", color: "#E65100" },
+  "national investment bank": { abbr: "NI", color: "#4A148C" },
+  "nibank": { abbr: "NI", color: "#4A148C" },
+  "chinggis khaan bank": { abbr: "CK", color: "#BF360C" },
+  "chinggis": { abbr: "CK", color: "#BF360C" },
+  "чингис хаан банк": { abbr: "CK", color: "#BF360C" },
+  "capitron bank": { abbr: "CP", color: "#00695C" },
+  "capitron": { abbr: "CP", color: "#00695C" },
+  "bogd bank": { abbr: "BG", color: "#37474F" },
+  "bogdbank": { abbr: "BG", color: "#37474F" },
+  "богд банк": { abbr: "BG", color: "#37474F" },
+  "candy pay": { abbr: "MP", color: "#C2185B" },
+  "мон пэй": { abbr: "MP", color: "#C2185B" },
+};
+
+const FALLBACK_COLORS = ["#5E35B1", "#0277BD", "#00838F", "#2E7D32", "#F9A825", "#D84315", "#6A1B9A", "#00695C"];
+
+function getBankBadge(name: string): { abbr: string; color: string } {
+  const key = (name || "").toLowerCase().trim();
+  const exact = BANK_BADGES[key];
+  if (exact) return exact;
+  const match = Object.keys(BANK_BADGES).find((k) => key.includes(k) || k.includes(key));
+  if (match) return BANK_BADGES[match];
+  const abbr = key.length >= 2 ? key.slice(0, 2).toUpperCase() : (key[0] ?? "?").toUpperCase();
   let hash = 0;
-  for (let i = 0; i < n.length; i++) hash = (hash << 5) - hash + n.charCodeAt(i);
-  const color = BANK_COLORS[Math.abs(hash) % BANK_COLORS.length];
-  return { letter, color };
+  for (let i = 0; i < key.length; i++) hash = (hash << 5) - hash + key.charCodeAt(i);
+  const color = FALLBACK_COLORS[Math.abs(hash) % FALLBACK_COLORS.length];
+  return { abbr, color };
 }
 
-function goBack() {
-  if (router.canGoBack()) {
-    router.back();
-  } else {
-    router.replace("/(tabs)/home");
-  }
-}
+const LOGO_DEV_SIZE = 112;
+const LOGO_DEV_BASE = "https://img.logo.dev";
 
-function BankLogo({ name, style }: { name: string; style?: object }) {
-  const [failed, setFailed] = useState(false);
-  const logoUrl = getBankLogoUrl(name);
-  const fallback = getBankLetterFallback(name);
-  if (!logoUrl || failed) {
+function BankBadge({ name }: { name: string }) {
+  const [logoError, setLogoError] = useState(false);
+  const domain = getBankDomain(name);
+  const token = getLogoDevPublishableKey();
+  const showLogo = Boolean(domain && token && !logoError);
+  const { abbr, color } = getBankBadge(name);
+
+  useEffect(() => {
+    setLogoError(false);
+  }, [name]);
+
+  if (showLogo && domain && token) {
+    const logoUri = `${LOGO_DEV_BASE}/${domain}?token=${encodeURIComponent(token)}&size=${LOGO_DEV_SIZE}&format=png&fallback=404`;
     return (
-      <View style={[styles.bankLogo, { backgroundColor: fallback.color }, style]}>
-        <Text style={styles.bankLogoLetter}>{fallback.letter}</Text>
+      <View style={[styles.bankBadge, styles.bankBadgeLogoWrap]}>
+        <Image
+          source={{ uri: logoUri }}
+          style={styles.bankBadgeLogo}
+          onError={() => setLogoError(true)}
+        />
       </View>
     );
   }
   return (
-    <Image
-      source={{ uri: logoUrl }}
-      style={[styles.bankLogoImage, style]}
-      resizeMode="contain"
-      onError={() => setFailed(true)}
-    />
+    <View style={[styles.bankBadge, { backgroundColor: color }]}>
+      <Text style={styles.bankBadgeText}>{abbr}</Text>
+    </View>
   );
 }
 
 export default function CheckoutConfirmScreen() {
-  const { token } = useAuth();
+  const { token, user, isRestored } = useAuth();
   const {
     checkoutItems,
     checkoutAddress,
@@ -122,10 +190,14 @@ export default function CheckoutConfirmScreen() {
   const [showOrderSuccess, setShowOrderSuccess] = useState(false);
   const [orderResult, setOrderResult] = useState<CreateOrderResponse | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [phone, setPhone] = useState("");
+  const [useVerifiedPhone, setUseVerifiedPhone] = useState(!!user?.phone);
+  const [phone, setPhone] = useState(user?.phone ?? "");
   const [paymentState, setPaymentState] = useState<CreateOrderWithQPayResponse | null>(null);
   const [checkingPayment, setCheckingPayment] = useState(false);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const verifiedPhone = user?.phone?.trim() ?? "";
+  const hasPhone = useVerifiedPhone ? !!verifiedPhone : phone.trim().length >= 1;
 
   const { subtotal, tax, delivery, grandTotal, lines } = useMemo(() => {
     if (!checkoutItems || checkoutItems.length === 0) {
@@ -165,13 +237,13 @@ export default function CheckoutConfirmScreen() {
       router.replace("/(tabs)/profile");
       return;
     }
-    const phoneTrim = phone.trim();
+    const phoneTrim = useVerifiedPhone && verifiedPhone ? verifiedPhone : phone.trim();
     if (!token || !checkoutAddress?.id || !checkoutItems?.length) {
       Alert.alert("Алдаа", "Хаяг эсвэл захиалгын мэдээлэл дутуу байна.");
       return;
     }
     if (!phoneTrim) {
-      Alert.alert("Алдаа", "Хүргэлтийн утасны дугаараа оруулна уу.");
+      Alert.alert("Алдаа", "Хүргэлтийн утасны дугаараа оруулна уу эсвэл баталгаажсан дугаараа ашиглана уу.");
       return;
     }
     setSubmitting(true);
@@ -221,6 +293,12 @@ export default function CheckoutConfirmScreen() {
     };
   }, [paymentState?.order.id, token, checkOrderPaid]);
 
+  useEffect(() => {
+    if (isRestored && !token) {
+      router.replace("/?showLogin=1");
+    }
+  }, [isRestored, token]);
+
   const handleSuccessDismiss = () => {
     router.replace("/(tabs)/home");
   };
@@ -263,47 +341,74 @@ export default function CheckoutConfirmScreen() {
       : null;
     return (
       <View style={styles.container}>
-        <Header title="QPay төлбөр" />
+        <BackButton />
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.paymentScrollContent}
           showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.paymentTitle}>Захиалга #{paymentState.order.id.slice(-8).toUpperCase()}</Text>
-          <Text style={styles.paymentSubtitle}>
-            Нийт: {formatTugrug(paymentState.order.grandTotal)} — QR уншуулж эсвэл доорх банкнаас сонгоно уу.
-          </Text>
+          <View style={styles.paymentOrderCard}>
+            <Text style={styles.paymentOrderLabel}>Захиалга</Text>
+            <Text style={styles.paymentOrderId}>#{paymentState.order.id.slice(-8).toUpperCase()}</Text>
+            <Text style={styles.paymentOrderTotal}>{formatTugrug(paymentState.order.grandTotal)}</Text>
+          </View>
+
           {qrUri ? (
-            <View style={styles.qrWrap}>
-              <Image source={{ uri: qrUri }} style={styles.qrImage} resizeMode="contain" />
-            </View>
-          ) : null}
-          <Text style={styles.bankLinksTitle}>Банк / апп руу үсрэх</Text>
-          {paymentState.qPay.urls?.map((u, i) => {
-            const label = u.name || u.description || "Төлөх";
-            return (
+            <View style={styles.qrCard}>
+              <Text style={styles.qrLabel}>QR уншуулна уу</Text>
+              <View style={styles.qrInner}>
+                <Image source={{ uri: qrUri }} style={styles.qrImage} resizeMode="contain" />
+              </View>
               <TouchableOpacity
-                key={i}
-                style={styles.bankLinkButton}
-                onPress={() => u.link && Linking.openURL(u.link)}
+                style={[styles.checkPaymentButton, checkingPayment && styles.checkPaymentButtonDisabled]}
+                onPress={checkingPayment ? undefined : handleCheckPayment}
+                disabled={checkingPayment}
+                activeOpacity={0.85}
               >
-                <BankLogo name={label} />
-                <Text style={styles.bankLinkText}>{label}</Text>
-                <Ionicons name="open-outline" size={18} color={THEME_PRIMARY} />
+                <Ionicons name="checkmark-circle-outline" size={22} color="#FFFFFF" style={styles.checkPaymentIcon} />
+                <Text style={styles.checkPaymentButtonText}>
+                  {checkingPayment ? "Шалгаж байна..." : "Төлбөр Шалгах"}
+                </Text>
               </TouchableOpacity>
-            );
-          })}
-          <Text style={styles.paymentNote}>Төлбөр төлсний дараа доорх товч дарж шалгана уу.</Text>
-          <TouchableOpacity
-            style={[styles.checkPaymentButton, checkingPayment && styles.checkPaymentButtonDisabled]}
-            onPress={checkingPayment ? undefined : handleCheckPayment}
-            disabled={checkingPayment}
-          >
-            <Ionicons name="card-outline" size={20} color="#FFFFFF" style={styles.checkPaymentIcon} />
-            <Text style={styles.checkPaymentButtonText}>
-              {checkingPayment ? "Шалгаж байна..." : "Төлбөр Шалгах"}
-            </Text>
-          </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={[styles.checkPaymentButton, styles.checkPaymentButtonStandalone, checkingPayment && styles.checkPaymentButtonDisabled]}
+              onPress={checkingPayment ? undefined : handleCheckPayment}
+              disabled={checkingPayment}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="checkmark-circle-outline" size={22} color="#FFFFFF" style={styles.checkPaymentIcon} />
+              <Text style={styles.checkPaymentButtonText}>
+                {checkingPayment ? "Шалгаж байна..." : "Төлбөр Шалгах"}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          <View style={styles.banksCard}>
+            <Text style={styles.banksCardTitle}>Банк / апп сонгох</Text>
+            <View style={styles.bankGrid}>
+              {paymentState.qPay.urls?.map((u, i) => {
+                const label = u.name || u.description || "Төлөх";
+                const displayName = getBankMongolianName(label);
+                return (
+                  <TouchableOpacity
+                    key={i}
+                    style={styles.bankGridItem}
+                    onPress={() => u.link && Linking.openURL(u.link)}
+                    activeOpacity={0.7}
+                  >
+                    <BankBadge name={label} />
+                    <Text style={styles.bankGridLabel} numberOfLines={2}>
+                      {displayName}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+
+          <Text style={styles.paymentNote}>Төлбөр төлсний дараа «Төлбөр Шалгах» товч дарж баталгаажуулна уу.</Text>
         </ScrollView>
       </View>
     );
@@ -316,14 +421,13 @@ export default function CheckoutConfirmScreen() {
       : "";
     return (
       <View style={styles.container}>
-        <Header title="Захиалга баталгаажлаа" />
+        <BackButton />
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.successScrollContent}
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.successCenter}>
-            <Text style={styles.successEmoji}>🎉</Text>
             <Text style={styles.successTitle}>Захиалга амжилттай!</Text>
             <Text style={styles.successSubtitle}>
               Таны захиалгыг өгсөн хаяг руу илгээж байна.
@@ -367,14 +471,7 @@ export default function CheckoutConfirmScreen() {
   if (!checkoutItems?.length || !checkoutAddress) {
     return (
       <View style={styles.container}>
-        <Header
-          title="Захиалга баталгаажуулах"
-          leftElement={
-            <TouchableOpacity onPress={goBack} style={styles.backBtn} activeOpacity={0.7}>
-              <Ionicons name="chevron-back" size={22} color="#111111" />
-            </TouchableOpacity>
-          }
-        />
+        <BackButton />
         <View style={styles.center}>
           <Text style={styles.errorText}>Захиалга эсвэл хаяг олдсонгүй. Буцаад дахин оролдоно уу.</Text>
         </View>
@@ -384,14 +481,7 @@ export default function CheckoutConfirmScreen() {
 
   return (
     <View style={styles.container}>
-      <Header
-        title="Захиалга баталгаажуулах"
-        leftElement={
-          <TouchableOpacity onPress={goBack} style={styles.backBtn} activeOpacity={0.7}>
-            <Ionicons name="chevron-back" size={22} color="#111111" />
-          </TouchableOpacity>
-        }
-      />
+      <BackButton />
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
@@ -417,14 +507,50 @@ export default function CheckoutConfirmScreen() {
 
         <Text style={[styles.sectionTitle, styles.sectionSpacing]}>Утасны дугаар</Text>
         <View style={styles.card}>
-          <TextInput
-            style={styles.phoneInput}
-            placeholder="Хүргэлттэй холбохоор утасны дугаар"
-            placeholderTextColor="#B0B0B0"
-            value={phone}
-            onChangeText={setPhone}
-            keyboardType="phone-pad"
-          />
+          {verifiedPhone ? (
+            <>
+              {useVerifiedPhone ? (
+                <View style={styles.phoneRow}>
+                  <Text style={styles.phoneVerifiedLabel}>Баталгаажсан дугаар ашиглах</Text>
+                  <Text style={styles.phoneVerifiedValue}>{verifiedPhone}</Text>
+                  <Pressable
+                    style={styles.phoneSwitchLink}
+                    onPress={() => setUseVerifiedPhone(false)}
+                  >
+                    <Text style={styles.phoneSwitchLinkText}>Өөр дугаар оруулах</Text>
+                  </Pressable>
+                </View>
+              ) : (
+                <View>
+                  <Pressable
+                    style={styles.phoneUseVerifiedWrap}
+                    onPress={() => setUseVerifiedPhone(true)}
+                  >
+                    <Text style={styles.phoneUseVerifiedText}>
+                      Баталгаажсан дугаар ашиглах ({verifiedPhone})
+                    </Text>
+                  </Pressable>
+                  <TextInput
+                    style={[styles.phoneInput, styles.phoneInputTop]}
+                    placeholder="Эсвэл өөр утасны дугаар оруулах"
+                    placeholderTextColor="#B0B0B0"
+                    value={phone}
+                    onChangeText={setPhone}
+                    keyboardType="phone-pad"
+                  />
+                </View>
+              )}
+            </>
+          ) : (
+            <TextInput
+              style={styles.phoneInput}
+              placeholder="Хүргэлттэй холбохоор утасны дугаар"
+              placeholderTextColor="#B0B0B0"
+              value={phone}
+              onChangeText={setPhone}
+              keyboardType="phone-pad"
+            />
+          )}
         </View>
 
         <Text style={[styles.sectionTitle, styles.sectionSpacing]}>Төлбөрийн тойм</Text>
@@ -455,8 +581,11 @@ export default function CheckoutConfirmScreen() {
 
       <View style={styles.footer}>
         <TouchableOpacity
-          style={[styles.confirmButton, submitting && styles.confirmButtonDisabled]}
-          onPress={submitting ? undefined : handleConfirm}
+          style={[
+            styles.confirmButton,
+            (submitting || !hasPhone) && styles.confirmButtonDisabled,
+          ]}
+          onPress={submitting || !hasPhone ? undefined : handleConfirm}
           disabled={submitting}
         >
           <Text style={styles.confirmButtonText}>
@@ -473,14 +602,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F5F5F7",
   },
-  backBtn: { padding: 8, marginLeft: -8 },
   successScrollContent: {
     paddingHorizontal: 32,
-    paddingTop: 24,
+    paddingTop: 72,
     paddingBottom: 40,
   },
   successCenter: {
     alignItems: "center",
+    height: "100%",
+    justifyContent: "center",
   },
   successEmoji: { fontSize: 56, marginBottom: 16 },
   successTitle: {
@@ -558,107 +688,187 @@ const styles = StyleSheet.create({
   },
   paymentScrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 40,
+    paddingTop: 72,
+    paddingBottom: 48,
   },
-  paymentTitle: {
+  paymentOrderCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  paymentOrderLabel: {
+    fontSize: 12,
+    color: "#888888",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 4,
+  },
+  paymentOrderId: {
     fontSize: 18,
     fontWeight: "700",
     color: "#111111",
-    marginBottom: 6,
   },
-  paymentSubtitle: {
+  paymentOrderTotal: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: THEME_PRIMARY,
+    marginTop: 14,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: "#F0F0F0",
+  },
+  qrCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 24,
+    marginBottom: 16,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  qrLabel: {
     fontSize: 14,
-    color: "#666666",
-    marginBottom: 20,
+    fontWeight: "600",
+    color: "#555555",
+    marginBottom: 16,
   },
-  qrWrap: {
-    alignSelf: "center",
-    padding: 16,
+  qrInner: {
+    padding: 12,
     backgroundColor: "#FFFFFF",
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#E5E5E5",
-    marginBottom: 24,
   },
   qrImage: {
     width: 200,
     height: 200,
   },
-  bankLinksTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#111111",
-    marginBottom: 12,
-  },
-  bankLinkButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+  banksCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#E5E5E5",
-    marginBottom: 8,
-  },
-  bankLogo: {
-    width: 40,
-    height: 40,
     borderRadius: 20,
+    paddingVertical: 8,
+    marginBottom: 8,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  banksCardTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#333333",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    paddingBottom: 8,
+  },
+  bankGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignSelf: "stretch",
+    paddingHorizontal: 6,
+    paddingBottom: 16,
+  },
+  bankGridItem: {
+    flexBasis: "25%",
+    width: "25%",
+    maxWidth: "25%",
+    alignItems: "center",
+    justifyContent: "flex-start",
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+    marginBottom: 4,
+  },
+  bankGridLabel: {
+    fontSize: 11,
+    fontWeight: "500",
+    color: "#555555",
+    marginTop: 6,
+    textAlign: "center",
+    paddingHorizontal: 2,
+  },
+  bankBadge: {
+    width: 56,
+    height: 56,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 12,
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.08)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.12,
+    shadowRadius: 3,
+    elevation: 2,
   },
-  bankLogoLetter: {
-    fontSize: 18,
-    fontWeight: "700",
+  bankBadgeLogoWrap: {
+    backgroundColor: "#FFF",
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    padding: 6,
+  },
+  bankBadgeLogo: {
+    width: 44,
+    height: 44,
+    borderRadius: 11,
+  },
+  bankBadgeText: {
+    fontSize: 14,
+    fontWeight: "800",
     color: "#FFFFFF",
-  },
-  bankLogoImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 12,
-    backgroundColor: "#F0F0F0",
-  },
-  bankLinkText: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: "500",
-    color: "#111111",
+    letterSpacing: 0.5,
   },
   checkPaymentButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 24,
-    paddingVertical: 14,
+    marginTop: 20,
+    paddingVertical: 16,
     paddingHorizontal: 24,
-    borderRadius: 12,
+    borderRadius: 16,
     backgroundColor: THEME_PRIMARY,
+    shadowColor: THEME_PRIMARY,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
   },
   checkPaymentButtonDisabled: {
-    opacity: 0.7,
+    opacity: 0.8,
+  },
+  checkPaymentButtonStandalone: {
+    marginBottom: 16,
   },
   checkPaymentIcon: {
-    marginRight: 8,
+    marginRight: 10,
   },
   checkPaymentButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: 17,
+    fontWeight: "700",
     color: "#FFFFFF",
   },
   paymentNote: {
-    fontSize: 13,
-    color: "#888888",
-    marginTop: 20,
+    fontSize: 12,
+    color: "#999999",
+    marginTop: 16,
     textAlign: "center",
+    paddingHorizontal: 16,
   },
-  scroll: { flex: 1 },
+  scroll: { flex: 1,
+    height: "100%",
+   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: 72,
   },
   sectionTitle: {
     fontSize: 18,
@@ -693,6 +903,38 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: "#111111",
     backgroundColor: "#FAFAFA",
+  },
+  phoneInputTop: {
+    marginTop: 10,
+  },
+  phoneRow: {
+    gap: 4,
+  },
+  phoneVerifiedLabel: {
+    fontSize: 13,
+    color: "#666666",
+  },
+  phoneVerifiedValue: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#111111",
+  },
+  phoneSwitchLink: {
+    alignSelf: "flex-start",
+    marginTop: 6,
+  },
+  phoneSwitchLinkText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: THEME_PRIMARY,
+  },
+  phoneUseVerifiedWrap: {
+    paddingVertical: 6,
+  },
+  phoneUseVerifiedText: {
+    fontSize: 14,
+    color: THEME_PRIMARY,
+    fontWeight: "500",
   },
   summaryRow: {
     flexDirection: "row",

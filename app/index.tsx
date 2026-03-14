@@ -1,4 +1,4 @@
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
   Animated,
@@ -11,6 +11,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { useAuth } from "../context/AuthContext";
 import { LoginContent } from "../components/LoginContent";
 
 const THEME_PRIMARY = "#8C1A7A";
@@ -42,12 +43,30 @@ const SLIDES = [
 ];
 
 export default function Index() {
+  const { token, isRestored } = useAuth();
+  const params = useLocalSearchParams<{ showLogin?: string }>();
   const [current, setCurrent] = useState(0);
   const [showLogin, setShowLogin] = useState(false);
   const [loginImageReady, setLoginImageReady] = useState(false);
   const scrollRef = useRef<ScrollView | null>(null);
   const slideAnim = useRef(new Animated.Value(-SCREEN_HEIGHT)).current;
   const slideFadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!isRestored) return;
+    if (token) {
+      router.replace("/(tabs)/home");
+    }
+  }, [isRestored, token]);
+
+  // When navigating here after logout (or "Нэвтрэх") show the same login overlay with slide transition
+  useEffect(() => {
+    if (params.showLogin === "1" || params.showLogin === "true") {
+      setShowLogin(true);
+      const t = setTimeout(() => setLoginImageReady(true), 400);
+      return () => clearTimeout(t);
+    }
+  }, [params.showLogin]);
 
   useEffect(() => {
     Animated.timing(slideFadeAnim, {
@@ -99,6 +118,10 @@ export default function Index() {
   };
 
   const isLast = current === SLIDES.length - 1;
+
+  if (!isRestored || token) {
+    return null;
+  }
 
   return (
     <View style={styles.container}>

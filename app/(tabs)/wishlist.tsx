@@ -1,5 +1,5 @@
 import { Dimensions, ScrollView, StyleSheet, Text, View } from "react-native";
-import { Header } from "../../components/Header";
+import { AppHeader } from "../../components/AppHeader";
 import { ProductCard } from "../../components/ProductCard";
 import { useGrocery } from "../../context/GroceryContext";
 
@@ -15,7 +15,7 @@ export default function WishlistScreen() {
 
   return (
     <View style={styles.container}>
-      <Header title="Хадгалсан" />
+      <AppHeader />
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}

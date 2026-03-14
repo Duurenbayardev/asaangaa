@@ -1,17 +1,19 @@
-import type { AuthTokens, LoginBody, SignUpBody, User } from "../types/api";
+import type { AuthTokens, User } from "../types/api";
 import { apiRequest, getAuthHeaders } from "./api-client";
 
-export async function login(body: LoginBody): Promise<AuthTokens> {
-  return apiRequest<AuthTokens>("/auth/login", {
+/** Send OTP to phone (public, no token). */
+export async function requestOtp(phone: string): Promise<{ message: string }> {
+  return apiRequest<{ message: string }>("/auth/send-otp", {
     method: "POST",
-    body: JSON.stringify(body),
+    body: JSON.stringify({ phone: phone.trim() }),
   });
 }
 
-export async function signUp(body: SignUpBody): Promise<AuthTokens> {
-  return apiRequest<AuthTokens>("/auth/signup", {
+/** Verify OTP and log in or sign up (public). Returns token + user. */
+export async function verifyOtp(phone: string, code: string): Promise<AuthTokens> {
+  return apiRequest<AuthTokens>("/auth/verify-otp", {
     method: "POST",
-    body: JSON.stringify(body),
+    body: JSON.stringify({ phone: phone.trim(), code: code.trim() }),
   });
 }
 
@@ -19,29 +21,6 @@ export async function getMe(token: string): Promise<User> {
   return apiRequest<User>("/auth/me", {
     method: "GET",
     headers: getAuthHeaders(token),
-  });
-}
-
-export async function verifyEmail(token: string): Promise<User> {
-  return apiRequest<User>("/auth/verify-email", {
-    method: "POST",
-    headers: getAuthHeaders(token),
-  });
-}
-
-export async function sendOtp(token: string, phone: string): Promise<void> {
-  await apiRequest<{ message: string }>("/auth/send-otp", {
-    method: "POST",
-    headers: getAuthHeaders(token),
-    body: JSON.stringify({ phone: phone.trim() }),
-  });
-}
-
-export async function verifyOtp(token: string, code: string): Promise<User> {
-  return apiRequest<User>("/auth/verify-otp", {
-    method: "POST",
-    headers: getAuthHeaders(token),
-    body: JSON.stringify({ code }),
   });
 }
 

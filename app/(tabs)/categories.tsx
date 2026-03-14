@@ -10,7 +10,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { Header } from "../../components/Header";
+import { AppHeader } from "../../components/AppHeader";
 import { getCategoriesOrdered } from "../../constants/categories";
 import { useGrocery } from "../../context/GroceryContext";
 
@@ -38,7 +38,7 @@ export default function CategoriesScreen() {
 
   return (
     <View style={styles.container}>
-      <Header title="Ангилал" />
+      <AppHeader />
       <View style={styles.searchWrap}>
         <TextInput
           style={styles.search}
@@ -85,6 +85,7 @@ const styles = StyleSheet.create({
   },
   searchWrap: {
     paddingHorizontal: PAD,
+    paddingTop: 12,
     paddingBottom: 12,
     backgroundColor: "#FFFFFF",
   },

@@ -1,19 +1,94 @@
+import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import {
   Alert,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
-import { Header } from "../../components/Header";
+import { AppHeader } from "../../components/AppHeader";
 import { VerificationBanner } from "../../components/VerificationBanner";
 import { useGrocery } from "../../context/GroceryContext";
+import type { BasketItem } from "../../context/GroceryContext";
 import { formatTugrug } from "../../lib/formatCurrency";
+import { useResolvedImageUri } from "../../lib/imageSource";
 
 const THEME_PRIMARY = "#8C1A7A";
+const CARD_PADDING = 16;
+const THUMB_SIZE = 88;
+
+function BasketRow({
+  item,
+  onUpdateQty,
+  onRemove,
+}: {
+  item: BasketItem;
+  onUpdateQty: (productId: string, qty: number) => void;
+  onRemove: (productId: string) => void;
+}) {
+  const uri = useResolvedImageUri(item.product.images?.[0]) ?? undefined;
+  const lineTotal = item.product.price * item.quantity;
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardLeft}>
+        {uri ? (
+          <Image source={{ uri }} style={styles.thumb} contentFit="cover" />
+        ) : (
+          <View style={[styles.thumb, styles.thumbPlaceholder]}>
+            <Ionicons name="image-outline" size={32} color="#CCC" />
+          </View>
+        )}
+        <View style={styles.cardBody}>
+          <Text style={styles.itemName} numberOfLines={2}>
+            {item.product.name}
+          </Text>
+          <Text style={styles.itemMeta}>
+            {item.product.unit} · {formatTugrug(item.product.price)} / нэгж
+          </Text>
+          <View style={styles.qtyRow}>
+            <View style={styles.stepper}>
+              <TouchableOpacity
+                style={styles.stepperBtn}
+                onPress={() => onUpdateQty(item.product.id, item.quantity - 1)}
+              >
+                <Ionicons name="remove" size={18} color="#333" />
+              </TouchableOpacity>
+              <Text style={styles.stepperValue}>{item.quantity}</Text>
+              <TouchableOpacity
+                style={styles.stepperBtn}
+                onPress={() => onUpdateQty(item.product.id, item.quantity + 1)}
+              >
+                <Ionicons name="add" size={18} color="#333" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.lineTotal}>{formatTugrug(lineTotal)}</Text>
+          </View>
+        </View>
+      </View>
+      <Pressable
+        style={styles.deleteBtn}
+        onPress={() =>
+          Alert.alert(
+            "Сагснаас хасах",
+            `${item.product.name} - энэ барааг хасах уу?`,
+            [
+              { text: "Үгүй", style: "cancel" },
+              { text: "Хасах", style: "destructive", onPress: () => onRemove(item.product.id) },
+            ]
+          )
+        }
+      >
+        <Ionicons name="trash-outline" size={20} color="#B42318" />
+      </Pressable>
+    </View>
+  );
+}
 
 export default function BasketScreen() {
   const { basket, setCheckoutItems, updateQuantity, userVerified } = useGrocery();
@@ -42,10 +117,12 @@ export default function BasketScreen() {
   if (!hasItems) {
     return (
       <View style={styles.container}>
-        <Header title="Миний сагс" />
+        <AppHeader />
         <View style={styles.emptyWrap}>
+          <Ionicons name="cart-outline" size={64} color="#C0C0C0" />
+          <Text style={styles.emptyTitle}>Сагс хоосон</Text>
           <Text style={styles.emptyText}>
-            Сагс хоосон байна. Нүүр эсвэл Ангилалаас бүтээгдэхүүн нэмнэ үү.
+            Нүүр эсвэл Ангилалаас бүтээгдэхүүн нэмж, төлбөр төлөхөд бэлтгэнэ үү.
           </Text>
         </View>
       </View>
@@ -54,68 +131,39 @@ export default function BasketScreen() {
 
   return (
     <View style={styles.container}>
-      <Header title="Миний сагс" />
+      <AppHeader />
       <ScrollView
         style={styles.list}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         {items.map((item) => (
-          <View key={item.product.id} style={styles.basketItemCard}>
-            <View style={styles.basketItemTopRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.basketItemName} numberOfLines={2}>
-                  {item.product.name}
-                </Text>
-                <Text style={styles.basketItemMeta}>
-                  {item.product.unit} · {formatTugrug(item.product.price)}
-                </Text>
-              </View>
-              <TouchableOpacity
-                style={styles.removeButton}
-                onPress={() => {
-                  Alert.alert(
-                    "Та энэ барааг сагснаасаа хасах гэж байна.",
-                    `${item.product.name}`,
-                    [
-                      { text: "Цуцлах ", style: "cancel" },
-                      {
-                        text: "Хасах",
-                        style: "destructive",
-                        onPress: () => updateQuantity(item.product.id, 0),
-                      },
-                    ]
-                  );
-                }}
-              >
-                <Text style={styles.removeButtonText}>Хасах</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.basketItemBottomRow}>
-              <Text style={styles.lineTotal}>
-                {formatTugrug(item.product.price * item.quantity)}
-              </Text>
-              <View style={styles.qtyControls}>
-                <TouchableOpacity
-                  style={styles.qtyButton}
-                  onPress={() => updateQuantity(item.product.id, item.quantity - 1)}
-                >
-                  <Text style={styles.qtyButtonText}>−</Text>
-                </TouchableOpacity>
-                <Text style={styles.qtyValue}>{item.quantity}</Text>
-                <TouchableOpacity
-                  style={[styles.qtyButton, styles.qtyButtonPrimary]}
-                  onPress={() => updateQuantity(item.product.id, item.quantity + 1)}
-                >
-                  <Text style={[styles.qtyButtonText, styles.qtyButtonTextPrimary]}>
-                    +
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
+          <BasketRow
+            key={item.product.id}
+            item={item}
+            onUpdateQty={updateQuantity}
+            onRemove={(id) => updateQuantity(id, 0)}
+          />
         ))}
+        <View style={styles.summaryCard}>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Дэд дүн</Text>
+            <Text style={styles.summaryValue}>{formatTugrug(subtotal)}</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>НӨАТ (10%)</Text>
+            <Text style={styles.summaryValue}>{formatTugrug(tax)}</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Хүргэлт</Text>
+            <Text style={styles.summaryValue}>{formatTugrug(delivery)}</Text>
+          </View>
+          <View style={[styles.summaryRow, styles.summaryTotalRow]}>
+            <Text style={styles.summaryTotalLabel}>Нийт дүн</Text>
+            <Text style={styles.summaryTotalValue}>{formatTugrug(grandTotal)}</Text>
+          </View>
+        </View>
+        <View style={{ height: 100 }} />
       </ScrollView>
 
       <VerificationBanner
@@ -151,97 +199,86 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingTop: 16,
-    paddingBottom: 48,
+    paddingBottom: 24,
   },
-  basketItemCard: {
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#E5E5E5",
-    backgroundColor: "#FFFFFF",
-    padding: 14,
-    marginBottom: 12,
-  },
-  basketItemTopRow: {
+  card: {
     flexDirection: "row",
     alignItems: "flex-start",
-    gap: 12,
-  },
-  basketItemName: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#111111",
-  },
-  basketItemMeta: {
-    marginTop: 4,
-    fontSize: 13,
-    color: "#777777",
-  },
-  removeButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: "#E8E8E8",
-    backgroundColor: "#FFFFFF",
+    padding: CARD_PADDING,
+    marginBottom: 12,
   },
-  removeButtonText: {
-    fontSize: 13,
+  cardLeft: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+  thumb: {
+    width: THUMB_SIZE,
+    height: THUMB_SIZE,
+    borderRadius: 10,
+    backgroundColor: "#F0F0F0",
+  },
+  thumbPlaceholder: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cardBody: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  itemName: {
+    fontSize: 15,
     fontWeight: "600",
-    color: "#B42318",
+    color: "#111111",
   },
-  basketItemBottomRow: {
-    marginTop: 12,
+  itemMeta: {
+    marginTop: 4,
+    fontSize: 12,
+    color: "#777777",
+  },
+  qtyRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 12,
+    marginTop: 10,
+  },
+  stepper: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    borderRadius: 8,
+    overflow: "hidden",
+  },
+  stepperBtn: {
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FAFAFA",
+  },
+  stepperValue: {
+    minWidth: 36,
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#111111",
+    textAlign: "center",
   },
   lineTotal: {
     fontSize: 15,
     fontWeight: "700",
     color: THEME_PRIMARY,
   },
-  qtyControls: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#E9E9E9",
-    borderRadius: 999,
-    overflow: "hidden",
-  },
-  qtyButton: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    backgroundColor: "#FFFFFF",
-  },
-  qtyButtonPrimary: {
-    backgroundColor: "#F6EAF3",
-  },
-  qtyButtonText: {
-    fontSize: 16,
-    fontWeight: "800",
-    color: "#444444",
-    minWidth: 14,
-    textAlign: "center",
-  },
-  qtyButtonTextPrimary: {
-    color: THEME_PRIMARY,
-  },
-  qtyValue: {
-    paddingHorizontal: 12,
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#111111",
-    minWidth: 24,
-    textAlign: "center",
-  },
-  heading: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#111111",
-    marginBottom: 12,
+  deleteBtn: {
+    padding: 8,
+    marginTop: -4,
+    marginRight: -4,
   },
   emptyWrap: {
     flex: 1,
@@ -249,10 +286,56 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 32,
   },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#333333",
+    marginTop: 16,
+    marginBottom: 8,
+  },
   emptyText: {
-    fontSize: 15,
+    fontSize: 14,
     color: "#777777",
     textAlign: "center",
+  },
+  summaryCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#E8E8E8",
+    padding: 16,
+    marginTop: 8,
+  },
+  summaryRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  summaryLabel: {
+    fontSize: 13,
+    color: "#666666",
+  },
+  summaryValue: {
+    fontSize: 13,
+    color: "#333333",
+  },
+  summaryTotalRow: {
+    marginTop: 8,
+    marginBottom: 0,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#EEE",
+  },
+  summaryTotalLabel: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#111111",
+  },
+  summaryTotalValue: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: THEME_PRIMARY,
   },
   footerBar: {
     flexDirection: "row",
@@ -285,186 +368,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "600",
     color: "#FFFFFF",
-  },
-  checkoutPanel: {
-    display: "none",
-  },
-  panelTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#111111",
-    marginBottom: 6,
-  },
-  helper: {
-    fontSize: 12,
-    color: "#999999",
-    marginBottom: 8,
-  },
-  addressInput: {
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#E1E1E1",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    minHeight: 60,
-    fontSize: 14,
-    color: "#111111",
-    backgroundColor: "#FAFAFA",
-  },
-  addressSpacing: {
-    marginTop: 8,
-  },
-  row: {
-    flexDirection: "row",
-    gap: 8,
-    marginTop: 8,
-  },
-  halfInput: {
-    flex: 1,
-    minHeight: 48,
-  },
-  checkoutRow: {
-    marginTop: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  totalLabel: {
-    fontSize: 13,
-    color: "#777777",
-  },
-  totalValue: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: THEME_PRIMARY,
-  },
-  confirmButton: {
-    paddingHorizontal: 22,
-    paddingVertical: 12,
-    borderRadius: 999,
-    backgroundColor: THEME_PRIMARY,
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "600",
-    overflow: "hidden",
-  },
-  confirmButtonDisabled: {
-    backgroundColor: "#D2B5CC",
-  },
-  sheetBackdrop: {
-    display: "none",
-  },
-  sheet: {
-    backgroundColor: "#FFFFFF",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingHorizontal: 20,
-    paddingTop: 14,
-    paddingBottom: 20,
-    maxHeight: "80%",
-  },
-  savedList: {
-    marginTop: 8,
-    gap: 8,
-  },
-  savedCard: {
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#E1E1E1",
-    padding: 10,
-    backgroundColor: "#FFFFFF",
-  },
-  savedCardActive: {
-    borderColor: THEME_PRIMARY,
-    backgroundColor: "#FFF6FE",
-  },
-  savedTopRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 4,
-  },
-  savedName: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#111111",
-  },
-  savedBody: {
-    fontSize: 13,
-    color: "#555555",
-  },
-  radio: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#C8C8C8",
-  },
-  radioActive: {
-    borderColor: THEME_PRIMARY,
-    backgroundColor: THEME_PRIMARY,
-  },
-  addNewButton: {
-    marginTop: 12,
-    alignSelf: "flex-start",
-  },
-  addNewText: {
-    fontSize: 13,
-    fontWeight: "500",
-    color: THEME_PRIMARY,
-  },
-  form: {
-    marginTop: 8,
-  },
-  sheetButtons: {
-    display: "none",
-  },
-  sheetSecondary: {
-    fontSize: 14,
-    color: "#777777",
-  },
-  sheetPrimary: {
-    display: "none",
-  },
-  paymentCard: {
-    marginTop: 16,
-    borderRadius: 16,
-    backgroundColor: "#FFFFFF",
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "#E5E5E5",
-    marginBottom: 24,
-  },
-  summary: {
-    marginTop: 12,
-  },
-  summaryRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 4,
-  },
-  summaryLabel: {
-    fontSize: 13,
-    color: "#777777",
-  },
-  summaryValue: {
-    fontSize: 13,
-    color: "#333333",
-  },
-  summaryDivider: {
-    height: 1,
-    backgroundColor: "#E8E8E8",
-    marginVertical: 8,
-  },
-  summaryTotalLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#111111",
-  },
-  summaryTotalValue: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: THEME_PRIMARY,
   },
 });
 

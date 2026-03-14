@@ -1,13 +1,26 @@
-import { Stack } from "expo-router";
+import { Stack, router } from "expo-router";
 import { useEffect, useState } from "react";
 import { View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { LoadingScreen } from "../components/LoadingScreen";
-import { AuthProvider } from "../context/AuthContext";
+import { AuthProvider, useAuth } from "../context/AuthContext";
 import { GroceryProvider } from "../context/GroceryContext";
+import { setOnUnauthorized } from "../lib/auth-callback";
 
 const INITIAL_LOAD_DURATION_MS = 1800;
+
+function AuthUnauthorizedHandler() {
+  const { setToken } = useAuth();
+  useEffect(() => {
+    setOnUnauthorized(() => {
+      setToken(null);
+      router.replace("/?showLogin=1");
+    });
+    return () => setOnUnauthorized(null);
+  }, [setToken]);
+  return null;
+}
 
 export default function RootLayout() {
   const [showInitialLoading, setShowInitialLoading] = useState(true);
@@ -30,8 +43,9 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
+        <AuthUnauthorizedHandler />
         <GroceryProvider>
-        <StatusBar style="light" />
+        <StatusBar style="auto" />
         <View style={{ flex: 1 }}>
           <Stack
             screenOptions={{
@@ -39,6 +53,7 @@ export default function RootLayout() {
               animation: "slide_from_right",
               fullScreenGestureEnabled: true,
               animationDuration: 200,
+              contentStyle: { flex: 1, backgroundColor: "#FFFFFF" },
             }}
           />
           {showInitialLoading && (

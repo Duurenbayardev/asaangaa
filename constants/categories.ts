@@ -16,7 +16,12 @@ export type CategoryId = (typeof CATEGORY_IDS)[number];
 export type CategoryConfig = {
   id: CategoryId;
   label: string;
+  /** Outline icon (e.g. for list/category page) */
   icon: "leaf-outline" | "nutrition-outline" | "cube-outline" | "flame-outline" | "archive-outline";
+  /** Filled icon for home category cards */
+  iconFilled: "leaf" | "nutrition" | "cube" | "flame" | "archive";
+  /** Icon color for filled icon on home */
+  iconColor: string;
   bg: string;
   order: number;
 };
@@ -26,6 +31,8 @@ export const CATEGORIES: CategoryConfig[] = [
     id: "nariin-nogoo",
     label: "Нарийн Ногоо",
     icon: "leaf-outline",
+    iconFilled: "leaf",
+    iconColor: "#2E7D32",
     bg: "#C8E6C9",
     order: 1,
   },
@@ -33,6 +40,8 @@ export const CATEGORIES: CategoryConfig[] = [
     id: "jims-jimsgene",
     label: "Жимс Жимсгэнэ",
     icon: "nutrition-outline",
+    iconFilled: "nutrition",
+    iconColor: "#E65100",
     bg: "#FFE0B2",
     order: 2,
   },
@@ -40,6 +49,8 @@ export const CATEGORIES: CategoryConfig[] = [
     id: "hataasan-jims",
     label: "Хатаасан Жимс",
     icon: "cube-outline",
+    iconFilled: "cube",
+    iconColor: "#F9A825",
     bg: "#FFECB3",
     order: 3,
   },
@@ -47,6 +58,8 @@ export const CATEGORIES: CategoryConfig[] = [
     id: "amtlagch",
     label: "Амтлагч",
     icon: "flame-outline",
+    iconFilled: "flame",
+    iconColor: "#C2185B",
     bg: "#F8BBD9",
     order: 4,
   },
@@ -54,6 +67,8 @@ export const CATEGORIES: CategoryConfig[] = [
     id: "jimsni-sav-baglaa-boodol",
     label: "Жимсний сав баглаа боодол",
     icon: "archive-outline",
+    iconFilled: "archive",
+    iconColor: "#0277BD",
     bg: "#B3E5FC",
     order: 5,
   },

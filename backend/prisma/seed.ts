@@ -1,5 +1,4 @@
 import { PrismaClient } from "@prisma/client";
-import * as bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
@@ -11,8 +10,7 @@ const CATEGORIES = [
   { id: "jimsni-sav-baglaa-boodol", label: "Жимсний сав баглаа боодол", order: 5 },
 ];
 
-const ADMIN_EMAIL = "admin@asanga.com";
-const ADMIN_PASSWORD = "Admin123!";
+const ADMIN_PHONE = process.env.ADMIN_PHONE ?? "+97699119911";
 const ADMIN_NAME = "Admin";
 
 async function main() {
@@ -27,26 +25,24 @@ async function main() {
   await prisma.product.deleteMany({});
 
   const existingAdmin = await prisma.user.findUnique({
-    where: { email: ADMIN_EMAIL },
+    where: { phone: ADMIN_PHONE },
   });
-  const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, 12);
   if (!existingAdmin) {
     await prisma.user.create({
       data: {
-        email: ADMIN_EMAIL,
-        passwordHash,
+        phone: ADMIN_PHONE,
         name: ADMIN_NAME,
         role: "admin",
         emailVerified: true,
       },
     });
-    console.log("Admin created:", ADMIN_EMAIL);
+    console.log("Admin created:", ADMIN_PHONE);
   } else {
     await prisma.user.update({
-      where: { email: ADMIN_EMAIL },
-      data: { passwordHash, role: "admin", name: ADMIN_NAME, emailVerified: true },
+      where: { phone: ADMIN_PHONE },
+      data: { role: "admin", name: ADMIN_NAME, emailVerified: true },
     });
-    console.log("Admin updated:", ADMIN_EMAIL);
+    console.log("Admin updated:", ADMIN_PHONE);
   }
 
   console.log("Seeded categories and admin. Products cleared.");

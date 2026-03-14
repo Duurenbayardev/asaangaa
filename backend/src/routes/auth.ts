@@ -3,46 +3,37 @@ import { body } from "express-validator";
 import { prisma } from "../lib/prisma";
 import { validate } from "../middleware/validate";
 import { auth, requireUser } from "../middleware/auth";
-import { hashPassword } from "../utils/hash";
 import { signToken, getExpiresInSeconds } from "../utils/jwt";
 import { normalizeMongolianPhoneToE164, isValidE164 } from "../utils/phone";
 import { twilioSendOtp, twilioVerifyOtp } from "../utils/twilio-verify";
 
 const router = Router();
 
-function toUser(u: { id: string; email: string; name: string | null; phone: string | null; role?: string; emailVerified: boolean; createdAt: Date }) {
+function toUser(u: { id: string; email: string | null; name: string | null; phone: string | null; role?: string; emailVerified: boolean; createdAt: Date }) {
   return {
     id: u.id,
-    email: u.email,
     name: u.name,
     phone: u.phone ?? undefined,
     role: u.role ?? "user",
-    emailVerified: u.emailVerified,
+    verified: u.emailVerified,
     createdAt: u.createdAt.toISOString(),
   };
 }
 
+// ----- Phone-only auth (public) -----
 router.post(
-  "/login",
-  validate([
-    body("email").isEmail().normalizeEmail(),
-    body("password").isString().notEmpty(),
-  ]),
+  "/send-otp",
+  validate([body("phone").isString().notEmpty().withMessage("Phone number required")]),
   async (req, res, next) => {
     try {
-      const { email, password } = req.body as { email: string; password: string };
-      const { verifyPassword } = await import("../utils/hash");
-      const user = await prisma.user.findUnique({ where: { email } });
-      if (!user || !user.passwordHash || !(await verifyPassword(password, user.passwordHash))) {
-        res.status(401).json({ message: "Invalid email or password", code: "INVALID_CREDENTIALS" });
+      const { phone } = req.body as { phone: string };
+      const to = normalizeMongolianPhoneToE164(phone.trim());
+      if (!isValidE164(to)) {
+        res.status(400).json({ message: "Invalid phone number", code: "INVALID_PHONE" });
         return;
       }
-      const accessToken = signToken({ userId: user.id, email: user.email });
-      res.json({
-        accessToken,
-        expiresIn: getExpiresInSeconds(),
-        user: toUser(user),
-      });
+      await twilioSendOtp(to);
+      res.json({ message: "OTP sent" });
     } catch (e) {
       next(e);
     }
@@ -50,26 +41,37 @@ router.post(
 );
 
 router.post(
-  "/signup",
+  "/verify-otp",
   validate([
-    body("email").isEmail().normalizeEmail(),
-    body("password").isString().isLength({ min: 8 }).withMessage("Password must be at least 8 characters"),
-    body("name").optional().isString().trim(),
+    body("phone").isString().notEmpty().withMessage("Phone number required"),
+    body("code").isString().trim().isLength({ min: 4, max: 10 }).withMessage("Code required"),
   ]),
   async (req, res, next) => {
     try {
-      const { email, password, name } = req.body as { email: string; password: string; name?: string };
-      const existing = await prisma.user.findUnique({ where: { email } });
-      if (existing) {
-        res.status(409).json({ message: "Email already registered", code: "EMAIL_EXISTS" });
+      const { phone, code } = req.body as { phone: string; code: string };
+      const to = normalizeMongolianPhoneToE164(phone.trim());
+      if (!isValidE164(to)) {
+        res.status(400).json({ message: "Invalid phone number", code: "INVALID_PHONE" });
         return;
       }
-      const passwordHash = await hashPassword(password);
-      const user = await prisma.user.create({
-        data: { email, passwordHash, name: name || null },
-      });
-      const accessToken = signToken({ userId: user.id, email: user.email });
-      res.status(201).json({
+      const ok = await twilioVerifyOtp(to, code);
+      if (!ok) {
+        res.status(400).json({ message: "Invalid code", code: "INVALID_CODE" });
+        return;
+      }
+      let user = await prisma.user.findUnique({ where: { phone: to } });
+      if (!user) {
+        user = await prisma.user.create({
+          data: { phone: to, emailVerified: true },
+        });
+      } else {
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: { emailVerified: true },
+        });
+      }
+      const accessToken = signToken({ userId: user.id });
+      res.json({
         accessToken,
         expiresIn: getExpiresInSeconds(),
         user: toUser(user),
@@ -83,74 +85,5 @@ router.post(
 router.get("/me", auth, requireUser, (req, res) => {
   res.json(toUser(req.user!));
 });
-
-router.post("/verify-email", auth, requireUser, async (req, res, next) => {
-  try {
-    const user = await prisma.user.update({
-      where: { id: req.userId! },
-      data: { emailVerified: true },
-    });
-    res.json(toUser(user));
-  } catch (e) {
-    next(e);
-  }
-});
-
-// ----- Phone verification (Twilio Verify) -----
-router.post(
-  "/send-otp",
-  auth,
-  requireUser,
-  validate([body("phone").isString().notEmpty().withMessage("Phone number required")]),
-  async (req, res, next) => {
-    try {
-      const { phone } = req.body as { phone: string };
-      const to = normalizeMongolianPhoneToE164(phone);
-      if (!isValidE164(to)) {
-        res.status(400).json({ message: "Invalid phone number", code: "INVALID_PHONE" });
-        return;
-      }
-      await twilioSendOtp(to);
-      // Persist phone on user so verify step can be only code-based (keeps frontend simple).
-      await prisma.user.update({
-        where: { id: req.userId! },
-        data: { phone: to },
-      });
-      res.json({ message: "OTP sent" });
-    } catch (e) {
-      next(e);
-    }
-  }
-);
-
-router.post(
-  "/verify-otp",
-  auth,
-  requireUser,
-  validate([body("code").isString().trim().isLength({ min: 4, max: 10 }).withMessage("Code required")]),
-  async (req, res, next) => {
-    try {
-      const { code } = req.body as { code: string };
-      const me = await prisma.user.findUnique({ where: { id: req.userId! } });
-      const to = me?.phone ?? "";
-      if (!to || !isValidE164(to)) {
-        res.status(400).json({ message: "No phone number on account. Send OTP first.", code: "NO_PHONE" });
-        return;
-      }
-      const ok = await twilioVerifyOtp(to, code);
-      if (!ok) {
-        res.status(400).json({ message: "Invalid code", code: "INVALID_CODE" });
-        return;
-      }
-      const user = await prisma.user.update({
-        where: { id: req.userId! },
-        data: { emailVerified: true },
-      });
-      res.json(toUser(user));
-    } catch (e) {
-      next(e);
-    }
-  }
-);
 
 export default router;

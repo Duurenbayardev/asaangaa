@@ -215,6 +215,15 @@ export async function apiRequest<T>(
         continue;
       }
 
+      if (res.status === 401) {
+        try {
+          const { triggerUnauthorized } = require("./auth-callback");
+          triggerUnauthorized();
+        } catch {
+          // ignore if auth-callback not set up
+        }
+      }
+
       const err: ApiError = {
         message: (data as { message?: string }).message ?? res.statusText,
         code: (data as { code?: string }).code,

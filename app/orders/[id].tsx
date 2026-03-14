@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { Header } from "../../components/Header";
+import { BackButton } from "../../components/BackButton";
 import { useAuth } from "../../context/AuthContext";
 import { formatTugrug } from "../../lib/formatCurrency";
 import type { Order } from "../../types/api";
@@ -19,16 +19,17 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: "Цуцлагдсан",
 };
 
-function goBack() {
-  if (router.canGoBack()) router.back();
-  else router.replace("/orders");
-}
-
 export default function OrderDetailScreen() {
   const params = useLocalSearchParams<{ id: string }>();
   const id = typeof params.id === "string" ? params.id : Array.isArray(params.id) ? params.id[0] : undefined;
-  const { token } = useAuth();
+  const { token, isRestored } = useAuth();
   const [order, setOrder] = useState<Order | null | undefined>(undefined);
+
+  useEffect(() => {
+    if (isRestored && !token) {
+      router.replace("/?showLogin=1");
+    }
+  }, [isRestored, token]);
 
   const load = useCallback(async () => {
     if (!token || !id) return;
@@ -48,17 +49,14 @@ export default function OrderDetailScreen() {
     load();
   }, [load, id]);
 
+  if (isRestored && !token) {
+    return null;
+  }
+
   if (order === undefined) {
     return (
       <View style={styles.container}>
-        <Header
-          title="Захиалгын дэлгэрэнгүй"
-          leftElement={
-            <Pressable onPress={goBack} style={styles.backBtn} hitSlop={16}>
-              <Ionicons name="chevron-back" size={22} color="#111111" />
-            </Pressable>
-          }
-        />
+        <BackButton fallbackHref="/orders" />
         <ActivityIndicator size="large" color={THEME} style={styles.spinner} />
       </View>
     );
@@ -67,14 +65,7 @@ export default function OrderDetailScreen() {
   if (!order) {
     return (
       <View style={styles.container}>
-        <Header
-          title="Захиалга"
-          leftElement={
-            <Pressable onPress={goBack} style={styles.backBtn} hitSlop={16}>
-              <Ionicons name="chevron-back" size={22} color="#111111" />
-            </Pressable>
-          }
-        />
+        <BackButton fallbackHref="/orders" />
         <View style={styles.center}>
           <Text style={styles.errorText}>Захиалга олдсонгүй.</Text>
         </View>
@@ -90,14 +81,7 @@ export default function OrderDetailScreen() {
 
   return (
     <View style={styles.container}>
-      <Header
-        title={`#${order.id.slice(-8).toUpperCase()}`}
-        leftElement={
-          <Pressable onPress={goBack} style={styles.backBtn} hitSlop={16}>
-            <Ionicons name="chevron-back" size={22} color="#111111" />
-          </Pressable>
-        }
-      />
+      <BackButton fallbackHref="/orders" />
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
@@ -169,12 +153,11 @@ export default function OrderDetailScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F5F5F7" },
-  backBtn: { padding: 12, marginLeft: -4, minWidth: 44, minHeight: 44, justifyContent: "center" },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
   errorText: { fontSize: 15, color: "#666" },
   spinner: { marginTop: 24 },
   scroll: { flex: 1 },
-  scrollContent: { padding: 20, paddingBottom: 24 },
+  scrollContent: { padding: 20, paddingTop: 72, paddingBottom: 24 },
   statusRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 },
   statusLabel: { fontSize: 14, color: "#666" },
   badge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: "#F0E6F0" },

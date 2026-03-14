@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 import { config } from "../config";
 import { prisma } from "../lib/prisma";
 
-export type JwtPayload = { userId: string; email: string };
+export type JwtPayload = { userId: string };
 
 export function auth(req: Request, res: Response, next: NextFunction): void {
   const authHeader = req.headers.authorization;
@@ -17,7 +17,6 @@ export function auth(req: Request, res: Response, next: NextFunction): void {
   try {
     const decoded = jwt.verify(token, config.jwt.secret) as JwtPayload;
     req.userId = decoded.userId;
-    req.userEmail = decoded.email;
     next();
   } catch {
     res.status(401).json({ message: "Invalid or expired token", code: "UNAUTHORIZED" });
@@ -28,8 +27,7 @@ declare global {
   namespace Express {
     interface Request {
       userId?: string;
-      userEmail?: string;
-      user?: { id: string; email: string; name: string | null; phone: string | null; role: string; emailVerified: boolean; createdAt: Date };
+      user?: { id: string; email: string | null; name: string | null; phone: string | null; role: string; emailVerified: boolean; createdAt: Date };
     }
   }
 }

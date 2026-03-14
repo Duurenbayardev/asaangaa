@@ -2,8 +2,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Dimensions, ImageBackground, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { AppHeader } from "../../components/AppHeader";
 import { LoadingScreen } from "../../components/LoadingScreen";
-import { Header } from "../../components/Header";
 import { ProductCard } from "../../components/ProductCard";
 import { getCategoriesOrdered } from "../../constants/categories";
 import { useAuth } from "../../context/AuthContext";
@@ -14,9 +14,8 @@ const BANNER_COUNT = 2;
 const SCREEN_PADDING = 20;
 const GAP = 12;
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
-// Bigger tiles: 3.5 visible in width → horizontally scrollable
-const HOME_CATEGORY_WIDTH = (SCREEN_WIDTH - SCREEN_PADDING * 2 - GAP * 3) / 3.5;
-const HOME_CATEGORY_HEIGHT = HOME_CATEGORY_WIDTH * 1.05;
+const CATEGORY_CARD_WIDTH = 100;
+const CATEGORY_CARD_GAP = 10;
 const PRODUCT_GAP = 12;
 const PRODUCT_SIZE = (SCREEN_WIDTH - SCREEN_PADDING * 2 - PRODUCT_GAP) / 2;
 
@@ -25,7 +24,7 @@ const CATEGORIES = getCategoriesOrdered();
 export default function HomeScreen() {
   const { user } = useAuth();
   const { products, basket } = useGrocery();
-  const displayName = user?.name?.trim() || user?.email?.split("@")[0] || "хэрэглэгч";
+  const displayName = user?.name?.trim() || user?.phone || "хэрэглэгч";
   const [bannersLoaded, setBannersLoaded] = useState(0);
   const [showLoading, setShowLoading] = useState(true);
 
@@ -51,8 +50,8 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
+      <AppHeader />
       {showLoading && <LoadingScreen progress={loadingProgress} />}
-      <Header />
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -93,36 +92,40 @@ export default function HomeScreen() {
           </ImageBackground>
         </ScrollView>
 
-        <View style={styles.categoriesRow}>
-          <Text style={styles.sectionTitle}>Ангилал</Text>
-          <Pressable onPress={() => router.push("/(tabs)/categories")}>
-            <Text style={styles.seeMore}>Бүгдийг харах</Text>
-          </Pressable>
-        </View>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoriesScrollContent}
-          style={styles.categoriesScroll}
-        >
-          {CATEGORIES.map((c) => (
+        <View style={styles.categoriesSection}>
+          <View style={styles.categoriesRow}>
+            <Text style={styles.sectionTitle}>Ангилал</Text>
             <Pressable
-              key={c.id}
-              style={[
-                styles.chip,
-                {
-                  width: HOME_CATEGORY_WIDTH,
-                  height: HOME_CATEGORY_HEIGHT,
-                  backgroundColor: c.bg,
-                },
-              ]}
-              onPress={() => router.push({ pathname: "/categories/[category]", params: { category: c.id } })}
+              onPress={() => router.push("/(tabs)/categories")}
+              style={({ pressed }) => [styles.seeMoreWrap, pressed && styles.seeMorePressed]}
             >
-              <Ionicons name={c.icon} size={28} color="#37474F" />
-              <Text style={styles.chipLabel} numberOfLines={2}>{c.label}</Text>
+              <Text style={styles.seeMore}>Бүгдийг харах</Text>
+              <Ionicons name="chevron-forward" size={16} color="#8C1A7A" />
             </Pressable>
-          ))}
-        </ScrollView>
+          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoriesScrollContent}
+            style={styles.categoriesScroll}
+          >
+            {CATEGORIES.map((c) => (
+              <Pressable
+                key={c.id}
+                style={({ pressed }) => [
+                  styles.categoryCard,
+                  pressed && styles.categoryCardPressed,
+                ]}
+                onPress={() => router.push({ pathname: "/categories/[category]", params: { category: c.id } })}
+              >
+                <View style={styles.categoryIconWrap}>
+                  <Ionicons name={c.iconFilled} size={38} color={c.iconColor} />
+                </View>
+                <Text style={styles.categoryLabel} numberOfLines={2}>{c.label}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
 
         <Text style={styles.sectionTitle}>Онцлох бүтээгдэхүүн</Text>
         <View style={styles.productGrid}>
@@ -187,47 +190,83 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#FFFFFF",
   },
+  categoriesSection: {
+    marginBottom: 20,
+  },
   categoriesRow: {
-    marginTop: 4,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 6,
+    marginBottom: 14,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#111111",
+    letterSpacing: -0.3,
+    marginBottom: 12,
+  },
+  seeMoreWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+  },
+  seeMorePressed: {
+    opacity: 0.7,
+  },
+  seeMore: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#8C1A7A",
   },
   categoriesScroll: {
     marginHorizontal: -SCREEN_PADDING,
-    marginBottom: 16,
   },
   categoriesScrollContent: {
     flexDirection: "row",
     paddingHorizontal: SCREEN_PADDING,
-    paddingRight: SCREEN_PADDING + 8,
+    gap: CATEGORY_CARD_GAP,
+    paddingRight: SCREEN_PADDING + 24,
   },
-  chip: {
-    marginRight: GAP,
-    borderRadius: 18,
-    overflow: "hidden",
-    justifyContent: "center",
+  categoryCard: {
+    width: CATEGORY_CARD_WIDTH,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 12,
     alignItems: "center",
-    padding: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
   },
-  chipLabel: {
-    fontSize: 13,
+  categoryCardPressed: {
+    opacity: 0.92,
+    transform: [{ scale: 0.98 }],
+  },
+  categoryIconWrap: {
+    width: 52,
+    height: 52,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 10,
+  },
+  categoryLabel: {
+    fontSize: 12,
     fontWeight: "600",
-    color: "#37474F",
-    marginTop: 6,
+    color: "#2d2d2d",
     textAlign: "center",
+    lineHeight: 16,
   },
-  sectionTitle: {
-    fontSize: 18,
+  productSectionTitle: {
+    fontSize: 20,
     fontWeight: "700",
     color: "#111111",
     marginBottom: 12,
-  },
-  seeMore: {
-    fontSize: 13,
-    fontWeight: "500",
-    color: "#8C1A7A",
+    letterSpacing: -0.3,
   },
   productGrid: {
     flexDirection: "row",

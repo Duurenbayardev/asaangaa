@@ -62,6 +62,9 @@ export function ProductCard({ product, basketItem, variant = "list" }: ProductCa
           </Pressable>
         </View>
         <Text style={styles.gridName} numberOfLines={2}>{product.name}</Text>
+        <Text style={styles.gridMeta} numberOfLines={1}>
+          {getCategoryLabel(product.category)} · {product.unit}
+        </Text>
         <Text style={styles.gridPrice}>{formatTugrug(product.price)}</Text>
         {quantity > 0 && (
           <Text style={styles.gridQuantity}>Сагсанд: {quantity}</Text>
@@ -195,6 +198,12 @@ const styles = StyleSheet.create({
     color: "#111111",
     paddingHorizontal: 10,
     paddingTop: 8,
+  },
+  gridMeta: {
+    fontSize: 11,
+    color: "#777777",
+    paddingHorizontal: 10,
+    paddingTop: 2,
   },
   gridPrice: {
     fontSize: 15,

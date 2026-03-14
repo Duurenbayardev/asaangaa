@@ -65,7 +65,7 @@ export default function AdminOrdersScreen() {
               <Text style={styles.orderId}>#{item.id.slice(-8)}</Text>
               <Text style={[styles.badge, item.status === "delivered" && styles.badgeSuccess]}>{item.status}</Text>
             </View>
-            <Text style={styles.email}>{item.userEmail}</Text>
+            {item.userPhone ? <Text style={styles.phoneLabel}>{item.userPhone}</Text> : null}
             {(item.address as { phone?: string })?.phone ? (
               <Text style={styles.phone}>Утас: {(item.address as { phone: string }).phone}</Text>
             ) : null}
@@ -96,7 +96,7 @@ const styles = StyleSheet.create({
   orderId: { fontSize: 14, fontWeight: "600", color: "#111" },
   badge: { fontSize: 11, fontWeight: "600", color: "#666", textTransform: "uppercase" },
   badgeSuccess: { color: "#2E7D32" },
-  email: { fontSize: 13, color: "#666", marginTop: 8 },
+  phoneLabel: { fontSize: 13, color: "#666", marginTop: 8 },
   phone: { fontSize: 13, color: "#555", marginTop: 2 },
   total: { fontSize: 16, fontWeight: "700", color: THEME, marginTop: 4 },
   date: { fontSize: 12, color: "#999", marginTop: 4 },

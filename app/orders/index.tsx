@@ -10,7 +10,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { Header } from "../../components/Header";
+import { BackButton } from "../../components/BackButton";
 import { useAuth } from "../../context/AuthContext";
 import { formatTugrug } from "../../lib/formatCurrency";
 import type { Order } from "../../types/api";
@@ -27,16 +27,17 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: "Цуцлагдсан",
 };
 
-function goBack() {
-  if (router.canGoBack()) router.back();
-  else router.replace("/(tabs)/profile");
-}
-
 export default function MyOrdersScreen() {
-  const { token } = useAuth();
+  const { token, isRestored } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    if (isRestored && !token) {
+      router.replace("/?showLogin=1");
+    }
+  }, [isRestored, token]);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -55,17 +56,14 @@ export default function MyOrdersScreen() {
     load();
   }, [load]);
 
+  if (isRestored && !token) {
+    return null;
+  }
+
   if (loading) {
     return (
       <View style={styles.centered}>
-        <Header
-          title="Миний захиалга"
-          leftElement={
-            <Pressable onPress={goBack} style={styles.backBtn} hitSlop={16}>
-              <Ionicons name="chevron-back" size={22} color="#111111" />
-            </Pressable>
-          }
-        />
+        <BackButton fallbackHref="/(tabs)/profile" />
         <ActivityIndicator size="large" color={THEME} style={styles.spinner} />
       </View>
     );
@@ -73,14 +71,7 @@ export default function MyOrdersScreen() {
 
   return (
     <View style={styles.container}>
-      <Header
-        title="Миний захиалга"
-        leftElement={
-          <Pressable onPress={goBack} style={styles.backBtn} hitSlop={16}>
-            <Ionicons name="chevron-back" size={22} color="#111111" />
-          </Pressable>
-        }
-      />
+      <BackButton fallbackHref="/(tabs)/profile" />
       {orders.length === 0 ? (
         <View style={styles.empty}>
           <Text style={styles.emptyText}>Захиалга байхгүй байна.</Text>
@@ -128,11 +119,10 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F5F5F7" },
   centered: { flex: 1 },
   spinner: { marginTop: 24 },
-  backBtn: { padding: 12, marginLeft: -4, minWidth: 44, minHeight: 44, justifyContent: "center" },
   empty: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
   emptyText: { fontSize: 17, fontWeight: "600", color: "#333" },
   emptySub: { fontSize: 14, color: "#777", marginTop: 8 },
-  list: { padding: 20, paddingBottom: 40 },
+  list: { padding: 20, paddingTop: 72, paddingBottom: 40 },
   card: {
     backgroundColor: "#FFF",
     borderRadius: 12,

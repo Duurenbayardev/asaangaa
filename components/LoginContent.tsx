@@ -26,11 +26,45 @@ type LoginContentProps = {
 
 export function LoginContent({ onContinue, showHeader = false, onHeroImageLoad }: LoginContentProps) {
   const auth = useAuth();
-  const [isSignUp, setIsSignUp] = useState(false);
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [phone, setPhone] = useState("");
+  const [code, setCode] = useState("");
+  const [step, setStep] = useState<"phone" | "code">("phone");
   const [error, setError] = useState<string | null>(null);
+
+  const handleSendOtp = async () => {
+    setError(null);
+    const trimmed = phone.trim().replace(/\D/g, "");
+    if (trimmed.length < 8) {
+      setError("Утасны дугаараа зөв оруулна уу.");
+      return;
+    }
+    try {
+      await auth.requestOtp(phone.trim());
+      setStep("code");
+    } catch (e: unknown) {
+      const msg = e && typeof e === "object" && "message" in e
+        ? String((e as { message: string }).message)
+        : "Код илгээхэд алдаа гарлаа. Дахин оролдоно уу.";
+      setError(msg);
+    }
+  };
+
+  const handleVerify = async () => {
+    setError(null);
+    if (!code.trim() || code.trim().length < 4) {
+      setError("Кодоо оруулна уу (4-6 орон).");
+      return;
+    }
+    try {
+      await auth.verifyOtp(phone.trim(), code.trim());
+      onContinue();
+    } catch (e: unknown) {
+      const msg = e && typeof e === "object" && "message" in e
+        ? String((e as { message: string }).message)
+        : "Код буруу байна. Дахин оролдоно уу.";
+      setError(msg);
+    }
+  };
 
   return (
     <KeyboardAvoidingView
@@ -42,7 +76,6 @@ export function LoginContent({ onContinue, showHeader = false, onHeroImageLoad }
         source={require("../assets/Group 3.png")}
         style={styles.heroImage}
         resizeMode="contain"
-        // onLoad={onHeroImageLoad}
       />
       <View style={styles.formSection}>
         <ScrollView
@@ -50,113 +83,67 @@ export function LoginContent({ onContinue, showHeader = false, onHeroImageLoad }
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.toggleRow}>
-            <TouchableOpacity
-              style={[styles.toggleTab, !isSignUp && styles.toggleTabActive]}
-              onPress={() => setIsSignUp(false)}
-            >
-              <Text style={[styles.toggleText, !isSignUp && styles.toggleTextActive]}>
-                Нэвтрэх
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.toggleTab, isSignUp && styles.toggleTabActive]}
-              onPress={() => setIsSignUp(true)}
-            >
-              <Text style={[styles.toggleText, isSignUp && styles.toggleTextActive]}>
-                Бүртгүүлэх
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          <Text style={styles.title}>
-            {isSignUp ? "Шинэ бүртгэл үүсгэх" : "Тавтай морилно уу"}
-          </Text>
+          <Text style={styles.title}>Нэвтрэх</Text>
           <Text style={styles.subtitle}>
-            {isSignUp
-              ? "Бүртгэл үүсгээд сагсаа дүүргээрэй."
-              : "Нэвтэрч сагсаа дүүргээрэй."}
+            Утасны дугаараа оруулаад баталгаажуулах кодыг аваарай.
           </Text>
 
-          {isSignUp && (
+          {step === "phone" ? (
             <>
-              <Text style={styles.label}>Нэр</Text>
+              <Text style={styles.label}>Утасны дугаар</Text>
               <TextInput
-                placeholder="Нэрээ оруулна уу"
+                placeholder="80123456 эсвэл 99123456"
+                keyboardType="phone-pad"
                 style={styles.input}
                 placeholderTextColor="#B0B0B0"
-                value={name}
-                onChangeText={setName}
+                value={phone}
+                onChangeText={(t) => { setPhone(t); setError(null); }}
               />
-              <View style={styles.labelSpacing} />
+              {error ? <Text style={styles.errorText}>{error}</Text> : null}
+              <TouchableOpacity
+                style={[styles.primaryButton, auth.isLoading && styles.primaryButtonDisabled]}
+                onPress={handleSendOtp}
+                disabled={auth.isLoading}
+              >
+                {auth.isLoading ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={styles.primaryButtonText}>Код авах</Text>
+                )}
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <Text style={styles.label}>Баталгаажуулах код</Text>
+              <TextInput
+                placeholder="SMS-ээр ирсэн 6 оронтой код"
+                keyboardType="number-pad"
+                maxLength={6}
+                style={styles.input}
+                placeholderTextColor="#B0B0B0"
+                value={code}
+                onChangeText={(t) => { setCode(t); setError(null); }}
+              />
+              {error ? <Text style={styles.errorText}>{error}</Text> : null}
+              <TouchableOpacity
+                style={[styles.primaryButton, auth.isLoading && styles.primaryButtonDisabled]}
+                onPress={handleVerify}
+                disabled={auth.isLoading}
+              >
+                {auth.isLoading ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={styles.primaryButtonText}>Нэвтрэх</Text>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.backLink}
+                onPress={() => { setStep("phone"); setCode(""); setError(null); }}
+              >
+                <Text style={styles.backLinkText}>Өөр дугаар ашиглах</Text>
+              </TouchableOpacity>
             </>
           )}
-
-          <Text style={styles.label}>И-мэйл</Text>
-          <TextInput
-            placeholder="имэйл@жишээ.com"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            style={styles.input}
-            placeholderTextColor="#B0B0B0"
-            value={email}
-            onChangeText={setEmail}
-          />
-
-          <Text style={[styles.label, styles.labelSpacing]}>Нууц үг</Text>
-          <TextInput
-            placeholder="••••••••"
-            secureTextEntry
-            style={styles.input}
-            placeholderTextColor="#B0B0B0"
-            value={password}
-            onChangeText={(t) => { setPassword(t); setError(null); }}
-          />
-
-          {error ? (
-            <Text style={styles.errorText}>{error}</Text>
-          ) : null}
-
-          <TouchableOpacity
-            style={[styles.primaryButton, auth.isLoading && styles.primaryButtonDisabled]}
-            onPress={async () => {
-              setError(null);
-              if (!email.trim()) {
-                setError("И-мэйлээ оруулна уу.");
-                return;
-              }
-              if (!password) {
-                setError("Нууц үгээ оруулна уу.");
-                return;
-              }
-              if (isSignUp && password.length < 8) {
-                setError("Нууц үг 8 тэмдэгтээс дээш байх ёстой.");
-                return;
-              }
-              try {
-                if (isSignUp) {
-                  await auth.signUp(email.trim(), password, name.trim() || undefined);
-                } else {
-                  await auth.login(email.trim(), password);
-                }
-                onContinue();
-              } catch (e: unknown) {
-                const msg = e && typeof e === "object" && "message" in e
-                  ? String((e as { message: string }).message)
-                  : "Холболт амжилтгүй. Дахин оролдоно уу.";
-                setError(msg);
-              }
-            }}
-            disabled={auth.isLoading}
-          >
-            {auth.isLoading ? (
-              <ActivityIndicator color="#FFFFFF" size="small" />
-            ) : (
-              <Text style={styles.primaryButtonText}>
-                {isSignUp ? "Бүртгүүлэх" : "Нэвтрэх"}
-              </Text>
-            )}
-          </TouchableOpacity>
         </ScrollView>
       </View>
     </KeyboardAvoidingView>
@@ -193,36 +180,6 @@ const styles = StyleSheet.create({
   formScroll: {
     paddingBottom: 48,
   },
-  toggleRow: {
-    flexDirection: "row",
-    marginBottom: 20,
-    backgroundColor: "#F0F0F0",
-    borderRadius: 12,
-    padding: 4,
-  },
-  toggleTab: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: "center",
-    borderRadius: 10,
-  },
-  toggleTabActive: {
-    backgroundColor: "#FFFFFF",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  toggleText: {
-    fontSize: 15,
-    fontWeight: "500",
-    color: "#666666",
-  },
-  toggleTextActive: {
-    color: THEME_PRIMARY,
-    fontWeight: "600",
-  },
   title: {
     fontSize: 24,
     fontWeight: "700",
@@ -238,9 +195,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "500",
     color: "#333333",
-  },
-  labelSpacing: {
-    marginTop: 16,
   },
   input: {
     marginTop: 6,
@@ -264,14 +218,22 @@ const styles = StyleSheet.create({
   primaryButtonDisabled: {
     opacity: 0.7,
   },
+  primaryButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#FFFFFF",
+  },
   errorText: {
     marginTop: 12,
     fontSize: 14,
     color: "#C62828",
   },
-  primaryButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#FFFFFF",
+  backLink: {
+    marginTop: 16,
+    alignItems: "center",
+  },
+  backLinkText: {
+    fontSize: 14,
+    color: "#666666",
   },
 });

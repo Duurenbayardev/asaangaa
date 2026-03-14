@@ -20,12 +20,12 @@ function toAdminOrderJson(o: {
   delivery: unknown;
   grandTotal: unknown;
   createdAt: Date;
-  user: { email: string; name: string | null };
+  user: { phone: string | null; name: string | null };
 }) {
   return {
     id: o.id,
     userId: o.userId,
-    userEmail: o.user.email,
+    userPhone: o.user.phone ?? undefined,
     userName: o.user.name,
     status: o.status,
     lines: o.lines.map((l) => ({
@@ -48,7 +48,7 @@ router.get("/", async (_req, res, next) => {
   try {
     const orders = await prisma.order.findMany({
       orderBy: { createdAt: "desc" },
-      include: { lines: true, user: { select: { id: true, email: true, name: true } } },
+      include: { lines: true, user: { select: { id: true, phone: true, name: true } } },
     });
     res.json(orders.map(toAdminOrderJson));
   } catch (e) {
@@ -60,7 +60,7 @@ router.get("/:id", async (req, res, next) => {
   try {
     const order = await prisma.order.findUnique({
       where: { id: req.params.id },
-      include: { lines: true, user: { select: { id: true, email: true, name: true } } },
+      include: { lines: true, user: { select: { id: true, phone: true, name: true } } },
     });
     if (!order) {
       res.status(404).json({ message: "Order not found", code: "NOT_FOUND" });
@@ -90,7 +90,7 @@ router.patch(
       const updated = await prisma.order.update({
         where: { id },
         data: { status },
-        include: { lines: true, user: { select: { id: true, email: true, name: true } } },
+        include: { lines: true, user: { select: { id: true, phone: true, name: true } } },
       });
       res.json(toAdminOrderJson(updated));
     } catch (e) {

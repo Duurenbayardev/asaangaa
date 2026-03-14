@@ -18,7 +18,7 @@ export default function AdminDashboard() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Удирдлага</Text>
-      <Text style={styles.subtitle}>Админ: {user.email}</Text>
+      <Text style={styles.subtitle}>Админ: {user.phone ?? "Админ"}</Text>
 
       <Pressable
         style={styles.card}
@@ -46,7 +46,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F5F5F7",
     padding: 20,
-    paddingTop: 60,
+    paddingTop: 20,
   },
   title: {
     fontSize: 28,

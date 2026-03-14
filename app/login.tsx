@@ -1,12 +1,14 @@
 import { router } from "expo-router";
 import { useEffect, useRef } from "react";
 import { Animated, Dimensions, StyleSheet, View } from "react-native";
-import { Header } from "../components/Header";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { BackButton } from "../components/BackButton";
 import { LoginContent } from "../components/LoginContent";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 export default function LoginScreen() {
+  const insets = useSafeAreaInsets();
   const slideAnim = useRef(new Animated.Value(-SCREEN_HEIGHT)).current;
 
   useEffect(() => {
@@ -19,9 +21,12 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container}>
-      <Header title="Нэвтрэх" />
+      <BackButton fallbackHref="/" />
       <Animated.View
-        style={[styles.slideWrap, { transform: [{ translateY: slideAnim }] }]}
+        style={[
+          styles.slideWrap,
+          { paddingTop: insets.top, paddingLeft: insets.left, paddingRight: insets.right, transform: [{ translateY: slideAnim }] },
+        ]}
       >
         <LoginContent onContinue={() => router.replace("/(tabs)/home")} />
       </Animated.View>

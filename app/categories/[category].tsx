@@ -6,23 +6,15 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from "react-native";
-import { Header } from "../../components/Header";
+import { BackButton } from "../../components/BackButton";
 import { ProductCard } from "../../components/ProductCard";
 import { getCategoryById } from "../../constants/categories";
 import { useGrocery } from "../../context/GroceryContext";
 
 const PAD = 20;
 
-function goBack() {
-  if (router.canGoBack()) {
-    router.back();
-  } else {
-    router.replace("/(tabs)/home");
-  }
-}
 const GAP = 12;
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const PRODUCT_SIZE = (SCREEN_WIDTH - PAD * 2 - GAP) / 2;
@@ -46,14 +38,7 @@ export default function CategoryDetailScreen() {
   if (!categorySlug || !categoryConfig) {
     return (
       <View style={styles.container}>
-        <Header
-          title="Ангилал олдсонгүй"
-          leftElement={
-            <TouchableOpacity onPress={goBack} style={styles.backBtn} activeOpacity={0.7}>
-              <Ionicons name="chevron-back" size={24} color="#111111" />
-            </TouchableOpacity>
-          }
-        />
+        <BackButton />
         <View style={styles.empty}>
           <Text style={styles.emptyText}>Энэ ангилал байхгүй байна.</Text>
         </View>
@@ -63,14 +48,7 @@ export default function CategoryDetailScreen() {
 
   return (
     <View style={styles.container}>
-      <Header
-        title={categoryConfig.label}
-        leftElement={
-          <TouchableOpacity onPress={goBack} style={styles.backBtn} activeOpacity={0.7}>
-            <Ionicons name="chevron-back" size={24} color="#111111" />
-          </TouchableOpacity>
-        }
-      />
+      <BackButton />
       <ScrollView
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
@@ -97,10 +75,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F5F5F7",
   },
-  backBtn: {
-    padding: 8,
-    marginLeft: -8,
-  },
   empty: {
     flex: 1,
     justifyContent: "center",
@@ -114,7 +88,7 @@ const styles = StyleSheet.create({
   },
   list: {
     paddingHorizontal: PAD,
-    paddingTop: 16,
+    paddingTop: 72,
   },
   productGrid: {
     flexDirection: "row",

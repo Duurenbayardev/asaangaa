@@ -26,24 +26,11 @@ asaangaa/
 └── .env.example            # Frontend: EXPO_PUBLIC_API_URL
 ```
 
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
+## Publish checklist
 
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-  apiKey: "AIzaSyCBRNFfWlvTog-muli2U5oscb2-n2nYAno",
-  authDomain: "asanga-b4245.firebaseapp.com",
-  projectId: "asanga-b4245",
-  storageBucket: "asanga-b4245.firebasestorage.app",
-  messagingSenderId: "982549907918",
-  appId: "1:982549907918:web:1fcf8e180e6c105159039f",
-  measurementId: "G-HFD154X0L3"
-};
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
+- **Environment**: Copy `.env.example` to `.env` and set:
+  - `EXPO_PUBLIC_API_URL` – production API URL (e.g. `https://asaangaa.onrender.com`). Never point at localhost in production.
+  - `EXPO_PUBLIC_LOGO_DEV_PUBLISHABLE_KEY` – optional; Logo.dev publishable key for bank logos. Omit or leave empty to hide logos.
+- **Secrets**: Do not commit `.env` or any file containing API keys, JWT secrets, or third‑party secrets. Backend secrets go in `backend/.env` (see `backend/README.md`).
+- **Auth**: On 401 (e.g. expired token), the app clears auth and redirects to login. Checkout and orders require login and redirect when not authenticated.
+- **Build**: Use EAS Build or `expo prebuild` + native build. Set production `EXPO_PUBLIC_API_URL` in EAS secrets or `.env` for the build.

@@ -1,10 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,7 +14,7 @@ import {
   View,
 } from "react-native";
 import { AddedToBasketToast } from "../../components/AddedToBasketToast";
-import { Header } from "../../components/Header";
+import { BackButton } from "../../components/BackButton";
 import { VerificationBanner } from "../../components/VerificationBanner";
 import { getCategoryLabel } from "../../constants/categories";
 import { getUnitDisplayLabel } from "../../constants/units";
@@ -23,14 +25,6 @@ import { useResolvedImageUri } from "../../lib/imageSource";
 const CAROUSEL_ITEM_WIDTH = Dimensions.get("window").width;
 
 const THEME_PRIMARY = "#8C1A7A";
-
-function goBack() {
-  if (router.canGoBack()) {
-    router.back();
-  } else {
-    router.replace("/(tabs)/home");
-  }
-}
 
 function ProductCarouselSlide({
   src,
@@ -77,6 +71,39 @@ function ProductCarouselSlide({
   );
 }
 
+const THUMB_SIZE = 56;
+const THUMB_GAP = 8;
+
+function ThumbnailButton({
+  src,
+  selected,
+  onPress,
+}: {
+  src: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  const uri = useResolvedImageUri(src) ?? undefined;
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[styles.thumbButton, selected && styles.thumbButtonSelected]}
+    >
+      {uri ? (
+        <Image
+          source={{ uri }}
+          style={styles.thumbImage}
+          contentFit="cover"
+        />
+      ) : (
+        <View style={[styles.thumbImage, styles.imagePlaceholder]}>
+          <Ionicons name="image-outline" size={20} color="#CCC" />
+        </View>
+      )}
+    </Pressable>
+  );
+}
+
 export default function ProductDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { products, basket, wishlist, addToBasket, updateQuantity, toggleWishlist, setCheckoutItems, userVerified } = useGrocery();
@@ -95,14 +122,26 @@ export default function ProductDetailScreen() {
   const dismissToast = useCallback(() => setShowAddedToast(false), []);
   const [imageLoaded, setImageLoaded] = useState<Record<number, boolean>>({});
   const [imageError, setImageError] = useState<Record<number, boolean>>({});
+  const [heroIndex, setHeroIndex] = useState(0);
+  const carouselRef = useRef<ScrollView>(null);
 
-  // Reset image state when product or images change so we retry loading
+  // Reset image state when product or images change
   useEffect(() => {
     if (product?.id) {
       setImageLoaded({});
       setImageError({});
+      setHeroIndex(0);
     }
   }, [product?.id, product?.images?.length]);
+
+  // Sync carousel scroll to heroIndex when thumbnail is tapped
+  useEffect(() => {
+    if (!product || product.images.length <= 1) return;
+    carouselRef.current?.scrollTo({
+      x: heroIndex * CAROUSEL_ITEM_WIDTH,
+      animated: true,
+    });
+  }, [heroIndex, product?.images?.length]);
 
   const onHeroImageLoad = useCallback((index: number) => {
     setImageLoaded((prev) => ({ ...prev, [index]: true }));
@@ -115,13 +154,7 @@ export default function ProductDetailScreen() {
   if (!product && !productsLoading) {
     return (
       <View style={styles.container}>
-        <Header
-          leftElement={
-            <Pressable onPress={goBack} style={styles.backButton} hitSlop={16}>
-              <Ionicons name="chevron-back" size={22} color="#111111" />
-            </Pressable>
-          }
-        />
+        <BackButton />
         <View style={styles.center}>
           <Text style={styles.errorText}>
             Энэ бүтээгдэхүүн олдсонгүй. Нүүр эсвэл Ангилалаас дахин оролдоно уу.
@@ -134,25 +167,22 @@ export default function ProductDetailScreen() {
   if (!product && productsLoading) {
     return (
       <View style={styles.container}>
-        <Header
-          leftElement={
-            <Pressable onPress={goBack} style={styles.backButton} hitSlop={16}>
-              <Ionicons name="chevron-back" size={22} color="#111111" />
-            </Pressable>
-          }
-        />
+        <BackButton />
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          <View style={[styles.heroImageWrap, styles.imagePlaceholder]}>
+          <View style={[styles.heroImageWrap, styles.loadingImageWrap]}>
             <ActivityIndicator size="large" color={THEME_PRIMARY} />
+            <Text style={styles.loadingImageText}>Бүтээгдэхүүн уншиж байна...</Text>
           </View>
           <View style={styles.hero}>
             <View style={styles.namePlaceholder} />
             <View style={styles.pricePlaceholder} />
+            <View style={[styles.pricePlaceholder, { width: 80, marginTop: 8 }]} />
           </View>
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Энэ бүтээгдэхүүний тухай</Text>
+            <View style={[styles.namePlaceholder, { width: "70%", height: 18, marginBottom: 12 }]} />
             <View style={styles.bodyPlaceholder}>
               <ActivityIndicator size="small" color={THEME_PRIMARY} />
+              <Text style={styles.loadingBodyText}>Тайлбар ачааллаж байна</Text>
             </View>
           </View>
         </ScrollView>
@@ -194,25 +224,23 @@ export default function ProductDetailScreen() {
 
   return (
     <View style={styles.container}>
-      <Header
-        title={product.name}
-        leftElement={
-          <Pressable onPress={goBack} style={styles.backButton} hitSlop={16}>
-            <Ionicons name="chevron-back" size={22} color="#111111" />
-          </Pressable>
-        }
-      />
+      <BackButton />
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         <ScrollView
+          ref={carouselRef}
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
           style={styles.imageCarousel}
           contentContainerStyle={styles.imageCarouselContent}
+          onMomentumScrollEnd={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
+            const i = Math.round(e.nativeEvent.contentOffset.x / CAROUSEL_ITEM_WIDTH);
+            setHeroIndex(Math.min(i, (product.images?.length ?? 1) - 1));
+          }}
         >
           {product.images.length === 0 ? (
             <View style={[styles.heroImageWrap, styles.imagePlaceholder]}>
@@ -233,6 +261,25 @@ export default function ProductDetailScreen() {
             ))
           )}
         </ScrollView>
+
+        {product.images.length > 1 ? (
+          <View style={styles.thumbnailStrip}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.thumbnailStripContent}
+            >
+              {product.images.map((src, index) => (
+                <ThumbnailButton
+                  key={index}
+                  src={src}
+                  selected={heroIndex === index}
+                  onPress={() => setHeroIndex(index)}
+                />
+              ))}
+            </ScrollView>
+          </View>
+        ) : null}
 
         <View style={styles.hero}>
           <View style={styles.heroBadge}>
@@ -294,9 +341,7 @@ export default function ProductDetailScreen() {
         <View>
           <Text style={styles.totalLabel}>Нийт дүн</Text>
           <Text style={styles.totalValue}>
-            {quantity > 0
-              ? formatTugrug(lineTotal)
-              : "-"}
+            {quantity > 0 ? formatTugrug(lineTotal) : "-"}
           </Text>
         </View>
         <View style={styles.checkoutButtons}>
@@ -346,13 +391,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F5F5F7",
   },
-  backButton: {
-    padding: 12,
-    marginLeft: -4,
-    minWidth: 44,
-    minHeight: 44,
-    justifyContent: "center",
-  },
   center: {
     flex: 1,
     alignItems: "center",
@@ -366,6 +404,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 0,
+    paddingTop: 72,
     paddingBottom: 48,
   },
   imageCarousel: {
@@ -375,6 +414,32 @@ const styles = StyleSheet.create({
   },
   imageCarouselContent: {
     alignItems: "stretch",
+  },
+  thumbnailStrip: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    marginBottom: 4,
+  },
+  thumbnailStripContent: {
+    flexDirection: "row",
+    gap: THUMB_GAP,
+  },
+  thumbButton: {
+    width: THUMB_SIZE,
+    height: THUMB_SIZE,
+    borderRadius: 10,
+    overflow: "hidden",
+    borderWidth: 2,
+    borderColor: "transparent",
+    backgroundColor: "#F0F0F0",
+  },
+  thumbButtonSelected: {
+    borderColor: THEME_PRIMARY,
+  },
+  thumbImage: {
+    width: THUMB_SIZE,
+    height: THUMB_SIZE,
+    borderRadius: 10,
   },
   heroImageWrap: {
     width: CAROUSEL_ITEM_WIDTH,
@@ -390,6 +455,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#F0F0F0",
+  },
+  loadingImageWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  loadingImageText: {
+    marginTop: 12,
+    fontSize: 13,
+    color: "#888888",
+  },
+  loadingBodyText: {
+    marginTop: 8,
+    fontSize: 12,
+    color: "#999999",
   },
   namePlaceholder: {
     height: 24,

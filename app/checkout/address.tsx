@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -11,21 +11,25 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { Header } from "../../components/Header";
+import { BackButton } from "../../components/BackButton";
+import { useAuth } from "../../context/AuthContext";
 import { useGrocery } from "../../context/GroceryContext";
 
 const THEME_PRIMARY = "#8C1A7A";
 
-function goBack() {
-  if (router.canGoBack()) {
-    router.back();
-  } else {
-    router.replace("/(tabs)/home");
-  }
-}
-
 export default function CheckoutAddressScreen() {
+  const { token, isRestored } = useAuth();
   const { addresses, addAddress, setCheckoutAddress } = useGrocery();
+
+  useEffect(() => {
+    if (isRestored && !token) {
+      router.replace("/?showLogin=1");
+    }
+  }, [isRestored, token]);
+
+  if (isRestored && !token) {
+    return null;
+  }
   const [fullName, setFullName] = useState("");
   const [line1, setLine1] = useState("");
   const [line2, setLine2] = useState("");
@@ -39,8 +43,9 @@ export default function CheckoutAddressScreen() {
   const canUseSaved = selectedId != null && addresses.length > 0 && !useNew;
   const canUseNew =
     useNew &&
-    line1.trim().length > 3 &&
-    city.trim().length > 2;
+    fullName.trim().length >= 1 &&
+    line1.trim().length >= 1 &&
+    city.trim().length >= 1;
 
   const handleContinue = async () => {
     if (canUseSaved) {
@@ -77,14 +82,7 @@ export default function CheckoutAddressScreen() {
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <Header
-        title="Хүргэлтийн хаяг"
-        leftElement={
-          <TouchableOpacity onPress={goBack} style={styles.backBtn} activeOpacity={0.7}>
-            <Ionicons name="chevron-back" size={22} color="#111111" />
-          </TouchableOpacity>
-        }
-      />
+      <BackButton />
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
@@ -200,11 +198,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F5F5F7",
   },
-  backBtn: { padding: 8, marginLeft: -8 },
   scroll: { flex: 1 },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: 72,
   },
   sectionTitle: {
     fontSize: 18,
