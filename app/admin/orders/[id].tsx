@@ -106,7 +106,7 @@ export default function AdminOrderDetailScreen() {
 
       <Text style={styles.sectionTitle}>Хэрэглэгч</Text>
       <View style={styles.card}>
-        {order.userPhone ? <Text style={styles.userPhone}>{order.userPhone}</Text> : null}
+        <Text style={styles.userEmail}>{order.userEmail}</Text>
         {order.userName ? <Text style={styles.userName}>{order.userName}</Text> : null}
       </View>
 
@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E8E8E8",
   },
-  userPhone: { fontSize: 15, fontWeight: "500", color: "#111" },
+  userEmail: { fontSize: 15, fontWeight: "500", color: "#111" },
   userName: { fontSize: 13, color: "#666", marginTop: 4 },
   statusChips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: "#F0F0F0" },

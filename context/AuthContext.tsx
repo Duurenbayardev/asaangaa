@@ -11,8 +11,12 @@ type AuthContextValue = {
   user: User | null;
   isLoading: boolean;
   isRestored: boolean;
-  requestOtp: (phone: string) => Promise<void>;
-  verifyOtp: (phone: string, code: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string, name?: string) => Promise<void>;
+  sendOtp: (phone: string) => Promise<void>;
+  verifyOtp: (code: string) => Promise<void>;
+  sendVerificationEmail: () => Promise<void>;
+  verifyEmail: (code: string) => Promise<void>;
   logout: () => void;
   setToken: (t: string | null) => void;
   setUser: (u: User | null) => void;
@@ -73,26 +77,81 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const requestOtp = useCallback(async (phone: string) => {
-    setIsLoading(true);
-    try {
-      await authApi.requestOtp(phone);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  const login = useCallback(
+    async (email: string, password: string) => {
+      setIsLoading(true);
+      try {
+        const data = await authApi.login({ email, password });
+        setTokenState(data.accessToken);
+        setUser(data.user);
+        await persistAuth(data.accessToken, data.user);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [persistAuth]
+  );
 
-  const verifyOtp = useCallback(async (phone: string, code: string) => {
+  const signUp = useCallback(
+    async (email: string, password: string, name?: string) => {
+      setIsLoading(true);
+      try {
+        const data = await authApi.signUp({ email, password, name });
+        setTokenState(data.accessToken);
+        setUser(data.user);
+        await persistAuth(data.accessToken, data.user);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [persistAuth]
+  );
+
+  const sendOtp = useCallback(async (phone: string) => {
+    if (!token) return;
     setIsLoading(true);
     try {
-      const data = await authApi.verifyOtp(phone, code);
-      setTokenState(data.accessToken);
-      setUser(data.user);
-      await persistAuth(data.accessToken, data.user);
+      await authApi.sendOtp(token, phone);
     } finally {
       setIsLoading(false);
     }
-  }, [persistAuth]);
+  }, [token]);
+
+  const verifyOtp = useCallback(async (code: string) => {
+    if (!token) return;
+    setIsLoading(true);
+    try {
+      const updated = await authApi.verifyOtp(token, code);
+      setUser(updated);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [token]);
+
+  const sendVerificationEmail = useCallback(async () => {
+    if (!token) return;
+    setIsLoading(true);
+    try {
+      await authApi.sendVerificationEmail(token);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [token]);
+
+  const verifyEmail = useCallback(
+    async (code: string) => {
+      if (!token) return;
+      setIsLoading(true);
+      try {
+        const updated = await authApi.verifyEmail(token, code);
+        setUser(updated);
+        await persistAuth(token, updated);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [token, persistAuth]
+  );
 
   const logout = useCallback(() => {
     clearStoredAuth();
@@ -110,14 +169,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user,
       isLoading,
       isRestored,
-      requestOtp,
+      login,
+      signUp,
+      sendOtp,
       verifyOtp,
+      sendVerificationEmail,
+      verifyEmail,
       logout,
       setToken,
       setUser,
       getAuthHeaders,
     }),
-    [token, user, isLoading, isRestored, requestOtp, verifyOtp, logout, setToken, setUser, getAuthHeaders]
+    [token, user, isLoading, isRestored, login, signUp, sendOtp, verifyOtp, sendVerificationEmail, verifyEmail, logout, setToken, setUser, getAuthHeaders]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

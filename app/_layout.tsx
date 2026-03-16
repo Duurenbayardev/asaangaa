@@ -15,7 +15,7 @@ function AuthUnauthorizedHandler() {
   useEffect(() => {
     setOnUnauthorized(() => {
       setToken(null);
-      router.replace("/?showLogin=1");
+      router.replace("/login");
     });
     return () => setOnUnauthorized(null);
   }, [setToken]);

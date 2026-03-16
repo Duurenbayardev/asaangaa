@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from "expo-router";
+import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
   Animated,
@@ -44,7 +44,6 @@ const SLIDES = [
 
 export default function Index() {
   const { token, isRestored } = useAuth();
-  const params = useLocalSearchParams<{ showLogin?: string }>();
   const [current, setCurrent] = useState(0);
   const [showLogin, setShowLogin] = useState(false);
   const [loginImageReady, setLoginImageReady] = useState(false);
@@ -58,15 +57,6 @@ export default function Index() {
       router.replace("/(tabs)/home");
     }
   }, [isRestored, token]);
-
-  // When navigating here after logout (or "Нэвтрэх") show the same login overlay with slide transition
-  useEffect(() => {
-    if (params.showLogin === "1" || params.showLogin === "true") {
-      setShowLogin(true);
-      const t = setTimeout(() => setLoginImageReady(true), 400);
-      return () => clearTimeout(t);
-    }
-  }, [params.showLogin]);
 
   useEffect(() => {
     Animated.timing(slideFadeAnim, {

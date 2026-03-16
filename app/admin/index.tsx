@@ -18,7 +18,7 @@ export default function AdminDashboard() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Удирдлага</Text>
-      <Text style={styles.subtitle}>Админ: {user.phone ?? "Админ"}</Text>
+      <Text style={styles.subtitle}>Админ: {user.email}</Text>
 
       <Pressable
         style={styles.card}

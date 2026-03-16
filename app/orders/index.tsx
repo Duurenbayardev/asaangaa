@@ -35,7 +35,7 @@ export default function MyOrdersScreen() {
 
   useEffect(() => {
     if (isRestored && !token) {
-      router.replace("/?showLogin=1");
+      router.replace("/login");
     }
   }, [isRestored, token]);
 

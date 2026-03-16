@@ -5,14 +5,15 @@
 
 import type { CategoryId } from "../constants/categories";
 
-// ----- Auth / User (phone-only, no email) -----
+// ----- Auth / User -----
 
 export interface User {
   id: string;
+  email: string;
   name: string | null;
   phone?: string;
   role?: string;
-  verified: boolean;
+  emailVerified: boolean;
   createdAt: string; // ISO
   updatedAt?: string;
 }
@@ -22,6 +23,17 @@ export interface AuthTokens {
   refreshToken?: string;
   expiresIn?: number;
   user: User;
+}
+
+export interface LoginBody {
+  email: string;
+  password: string;
+}
+
+export interface SignUpBody {
+  email: string;
+  password: string;
+  name?: string;
 }
 
 // ----- Product -----

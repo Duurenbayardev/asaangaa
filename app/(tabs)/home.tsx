@@ -24,7 +24,7 @@ const CATEGORIES = getCategoriesOrdered();
 export default function HomeScreen() {
   const { user } = useAuth();
   const { products, basket } = useGrocery();
-  const displayName = user?.name?.trim() || user?.phone || "хэрэглэгч";
+  const displayName = user?.name?.trim() || user?.email?.split("@")[0] || "хэрэглэгч";
   const [bannersLoaded, setBannersLoaded] = useState(0);
   const [showLoading, setShowLoading] = useState(true);
 
