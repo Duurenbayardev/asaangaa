@@ -128,7 +128,8 @@ export default function ProfileScreen() {
                           await sendVerificationEmail();
                           setEmailCodeSent(true);
                         } catch (e: unknown) {
-                          setEmailError(e && typeof e === "object" && "message" in e ? String((e as { message: string }).message) : "Код илгээхэд алдаа гарлаа.");
+                          const msg = e && typeof e === "object" && "message" in e ? String((e as { message: string }).message) : "Код илгээхэд алдаа гарлаа.";
+                          setEmailError(msg);
                         }
                       }}
                       disabled={authLoading}

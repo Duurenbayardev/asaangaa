@@ -43,6 +43,7 @@ export const config = {
     port: process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : undefined,
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
+    resendApiKey: process.env.RESEND_API_KEY ?? "",
   },
 
   twilio: {
