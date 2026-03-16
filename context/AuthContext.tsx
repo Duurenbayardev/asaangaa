@@ -13,10 +13,10 @@ type AuthContextValue = {
   isRestored: boolean;
   login: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, name?: string) => Promise<void>;
-  sendOtp: (phone: string) => Promise<void>;
-  verifyOtp: (code: string) => Promise<void>;
   sendVerificationEmail: () => Promise<void>;
   verifyEmail: (code: string) => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<void>;
+  resetPassword: (email: string, code: string, newPassword: string) => Promise<void>;
   logout: () => void;
   setToken: (t: string | null) => void;
   setUser: (u: User | null) => void;
@@ -107,27 +107,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [persistAuth]
   );
 
-  const sendOtp = useCallback(async (phone: string) => {
-    if (!token) return;
-    setIsLoading(true);
-    try {
-      await authApi.sendOtp(token, phone);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [token]);
-
-  const verifyOtp = useCallback(async (code: string) => {
-    if (!token) return;
-    setIsLoading(true);
-    try {
-      const updated = await authApi.verifyOtp(token, code);
-      setUser(updated);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [token]);
-
   const sendVerificationEmail = useCallback(async () => {
     if (!token) return;
     setIsLoading(true);
@@ -153,6 +132,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [token, persistAuth]
   );
 
+  const requestPasswordReset = useCallback(async (email: string) => {
+    setIsLoading(true);
+    try {
+      await authApi.requestPasswordReset(email);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const resetPassword = useCallback(async (email: string, code: string, newPassword: string) => {
+    setIsLoading(true);
+    try {
+      await authApi.resetPassword(email, code, newPassword);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   const logout = useCallback(() => {
     clearStoredAuth();
     setTokenState(null);
@@ -171,16 +168,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isRestored,
       login,
       signUp,
-      sendOtp,
-      verifyOtp,
       sendVerificationEmail,
       verifyEmail,
+      requestPasswordReset,
+      resetPassword,
       logout,
       setToken,
       setUser,
       getAuthHeaders,
     }),
-    [token, user, isLoading, isRestored, login, signUp, sendOtp, verifyOtp, sendVerificationEmail, verifyEmail, logout, setToken, setUser, getAuthHeaders]
+    [token, user, isLoading, isRestored, login, signUp, sendVerificationEmail, verifyEmail, requestPasswordReset, resetPassword, logout, setToken, setUser, getAuthHeaders]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -17,18 +17,10 @@ import { useGrocery } from "../../context/GroceryContext";
 import { formatTugrug } from "../../lib/formatCurrency";
 
 export default function ProfileScreen() {
-  const { user, token, isRestored, sendOtp, verifyOtp, sendVerificationEmail, verifyEmail, logout: authLogout, isLoading: authLoading } = useAuth();
-  const [verificationMethod, setVerificationMethod] = useState<"email" | "phone">("email");
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpPhone, setOtpPhone] = useState(user?.phone ?? "");
-  const [otpCode, setOtpCode] = useState("");
-  const [otpError, setOtpError] = useState<string | null>(null);
+  const { user, token, isRestored, sendVerificationEmail, verifyEmail, logout: authLogout, isLoading: authLoading } = useAuth();
   const [emailCodeSent, setEmailCodeSent] = useState(false);
   const [emailCode, setEmailCode] = useState("");
   const [emailError, setEmailError] = useState<string | null>(null);
-  useEffect(() => {
-    if (user?.phone) setOtpPhone(user.phone.replace(/\D/g, "").slice(-8));
-  }, [user?.phone]);
   const { addresses, basket, wishlist, total, userVerified } = useGrocery();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const displayName = user?.name?.trim() || user?.email?.split("@")[0] || "Зочлон худалдан авагч";
@@ -124,153 +116,60 @@ export default function ProfileScreen() {
             </View>
             {!userVerified && user && (
               <View style={styles.otpBlock}>
-                <View style={styles.verificationMethodRow}>
-                  <TouchableOpacity
-                    style={[styles.verificationMethodBtn, verificationMethod === "email" && styles.verificationMethodBtnActive]}
-                    onPress={() => {
-                      setVerificationMethod("email");
-                      setOtpError(null);
-                      setEmailError(null);
-                    }}
-                  >
-                    <Ionicons name="mail-outline" size={18} color={verificationMethod === "email" ? "#FFFFFF" : "#666"} />
-                    <Text style={[styles.verificationMethodText, verificationMethod === "email" && styles.verificationMethodTextActive]}>Имэйлээр</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.verificationMethodBtn, verificationMethod === "phone" && styles.verificationMethodBtnActive]}
-                    onPress={() => {
-                      setVerificationMethod("phone");
-                      setOtpError(null);
-                      setEmailError(null);
-                    }}
-                  >
-                    <Ionicons name="call-outline" size={18} color={verificationMethod === "phone" ? "#FFFFFF" : "#666"} />
-                    <Text style={[styles.verificationMethodText, verificationMethod === "phone" && styles.verificationMethodTextActive]}>Утасаар</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {verificationMethod === "email" ? (
-                  !emailCodeSent ? (
-                    <>
-                      <Text style={styles.otpHint}>{user.email} хаяг руу 6 оронтой код илгээгдэнэ.</Text>
-                      {emailError ? <Text style={styles.otpError}>{emailError}</Text> : null}
-                      <TouchableOpacity
-                        style={[styles.verifyButton, authLoading && styles.verifyButtonDisabled]}
-                        onPress={async () => {
-                          setEmailError(null);
-                          try {
-                            await sendVerificationEmail();
-                            setEmailCodeSent(true);
-                          } catch (e: unknown) {
-                            setEmailError(e && typeof e === "object" && "message" in e ? String((e as { message: string }).message) : "Код илгээхэд алдаа гарлаа.");
-                          }
-                        }}
-                        disabled={authLoading}
-                      >
-                        {authLoading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Ionicons name="mail-outline" size={20} color="#FFFFFF" />}
-                        <Text style={styles.verifyButtonText}>Имэйл рүү код илгээх</Text>
-                      </TouchableOpacity>
-                    </>
-                  ) : (
-                    <>
-                      <Text style={styles.otpHint}>Имэйлээр ирсэн 6 оронтой кодыг оруулна уу.</Text>
-                      <TextInput
-                        style={styles.otpInput}
-                        placeholder="000000"
-                        placeholderTextColor="#B0B0B0"
-                        value={emailCode}
-                        onChangeText={(t) => { setEmailCode(t.replace(/\D/g, "").slice(0, 6)); setEmailError(null); }}
-                        keyboardType="number-pad"
-                        maxLength={6}
-                      />
-                      {emailError ? <Text style={styles.otpError}>{emailError}</Text> : null}
-                      <View style={styles.otpRow}>
-                        <TouchableOpacity
-                          style={styles.otpSecondaryBtn}
-                          onPress={() => { setEmailCodeSent(false); setEmailCode(""); setEmailError(null); }}
-                        >
-                          <Text style={styles.otpSecondaryText}>Буцах</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.verifyButton, (authLoading || emailCode.length !== 6) && styles.verifyButtonDisabled]}
-                          onPress={async () => {
-                            setEmailError(null);
-                            try {
-                              await verifyEmail(emailCode);
-                              setEmailCodeSent(false);
-                              setEmailCode("");
-                            } catch (e: unknown) {
-                              setEmailError(e && typeof e === "object" && "message" in e ? String((e as { message: string }).message) : "Код буруу эсвэл хугацаа дууссан.");
-                            }
-                          }}
-                          disabled={authLoading || emailCode.length !== 6}
-                        >
-                          {authLoading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" />}
-                          <Text style={styles.verifyButtonText}>Баталгаажуулах</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </>
-                  )
-                ) : !otpSent ? (
+                {!emailCodeSent ? (
                   <>
-                    <Text style={styles.otpHint}>Монгол утасны дугаараа оруулна уу (жишээ: 99123456)</Text>
-                    <TextInput
-                      style={styles.otpInput}
-                      placeholder="99123456"
-                      placeholderTextColor="#B0B0B0"
-                      value={otpPhone}
-                      onChangeText={(t) => { setOtpPhone(t.replace(/\D/g, "").slice(0, 11)); setOtpError(null); }}
-                      keyboardType="phone-pad"
-                      maxLength={11}
-                    />
-                    {otpError ? <Text style={styles.otpError}>{otpError}</Text> : null}
+                    <Text style={styles.otpHint}>{user.email} хаяг руу 6 оронтой код илгээгдэнэ.</Text>
+                    {emailError ? <Text style={styles.otpError}>{emailError}</Text> : null}
                     <TouchableOpacity
-                      style={[styles.verifyButton, (authLoading || otpPhone.length < 8) && styles.verifyButtonDisabled]}
+                      style={[styles.verifyButton, authLoading && styles.verifyButtonDisabled]}
                       onPress={async () => {
-                        setOtpError(null);
+                        setEmailError(null);
                         try {
-                          await sendOtp(otpPhone);
-                          setOtpSent(true);
+                          await sendVerificationEmail();
+                          setEmailCodeSent(true);
                         } catch (e: unknown) {
-                          setOtpError(e && typeof e === "object" && "message" in e ? String((e as { message: string }).message) : "Код илгээхэд алдаа гарлаа.");
+                          setEmailError(e && typeof e === "object" && "message" in e ? String((e as { message: string }).message) : "Код илгээхэд алдаа гарлаа.");
                         }
                       }}
-                      disabled={authLoading || otpPhone.length < 8}
+                      disabled={authLoading}
                     >
-                      {authLoading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Ionicons name="call-outline" size={20} color="#FFFFFF" />}
-                      <Text style={styles.verifyButtonText}>Утас руу OTP илгээх</Text>
+                      {authLoading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Ionicons name="mail-outline" size={20} color="#FFFFFF" />}
+                      <Text style={styles.verifyButtonText}>Имэйл рүү код илгээх</Text>
                     </TouchableOpacity>
                   </>
                 ) : (
                   <>
-                    <Text style={styles.otpHint}>Утасаар ирсэн 6 оронтой кодыг оруулна уу.</Text>
+                    <Text style={styles.otpHint}>Имэйлээр ирсэн 6 оронтой кодыг оруулна уу.</Text>
                     <TextInput
                       style={styles.otpInput}
                       placeholder="000000"
                       placeholderTextColor="#B0B0B0"
-                      value={otpCode}
-                      onChangeText={(t) => { setOtpCode(t.replace(/\D/g, "").slice(0, 6)); setOtpError(null); }}
+                      value={emailCode}
+                      onChangeText={(t) => { setEmailCode(t.replace(/\D/g, "").slice(0, 6)); setEmailError(null); }}
                       keyboardType="number-pad"
                       maxLength={6}
                     />
-                    {otpError ? <Text style={styles.otpError}>{otpError}</Text> : null}
+                    {emailError ? <Text style={styles.otpError}>{emailError}</Text> : null}
                     <View style={styles.otpRow}>
-                      <TouchableOpacity style={styles.otpSecondaryBtn} onPress={() => { setOtpSent(false); setOtpCode(""); setOtpError(null); }}>
+                      <TouchableOpacity
+                        style={styles.otpSecondaryBtn}
+                        onPress={() => { setEmailCodeSent(false); setEmailCode(""); setEmailError(null); }}
+                      >
                         <Text style={styles.otpSecondaryText}>Буцах</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
-                        style={[styles.verifyButton, (authLoading || otpCode.length !== 6) && styles.verifyButtonDisabled]}
+                        style={[styles.verifyButton, (authLoading || emailCode.length !== 6) && styles.verifyButtonDisabled]}
                         onPress={async () => {
-                          setOtpError(null);
+                          setEmailError(null);
                           try {
-                            await verifyOtp(otpCode);
-                            setOtpSent(false);
-                            setOtpCode("");
+                            await verifyEmail(emailCode);
+                            setEmailCodeSent(false);
+                            setEmailCode("");
                           } catch (e: unknown) {
-                            setOtpError(e && typeof e === "object" && "message" in e ? String((e as { message: string }).message) : "Код буруу байна.");
+                            setEmailError(e && typeof e === "object" && "message" in e ? String((e as { message: string }).message) : "Код буруу эсвэл хугацаа дууссан.");
                           }
                         }}
-                        disabled={authLoading || otpCode.length !== 6}
+                        disabled={authLoading || emailCode.length !== 6}
                       >
                         {authLoading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" />}
                         <Text style={styles.verifyButtonText}>Баталгаажуулах</Text>
@@ -614,26 +513,6 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
   otpBlock: { marginTop: 12 },
-  verificationMethodRow: { flexDirection: "row", gap: 10, marginBottom: 14 },
-  verificationMethodBtn: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#E1E1E1",
-    backgroundColor: "#FAFAFA",
-  },
-  verificationMethodBtnActive: {
-    backgroundColor: "#8C1A7A",
-    borderColor: "#8C1A7A",
-  },
-  verificationMethodText: { fontSize: 14, fontWeight: "600", color: "#666" },
-  verificationMethodTextActive: { color: "#FFFFFF" },
   otpHint: { fontSize: 13, color: "#666", marginBottom: 8 },
   otpInput: {
     borderWidth: 1,

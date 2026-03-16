@@ -37,19 +37,17 @@ export async function verifyEmail(token: string, code: string): Promise<User> {
   });
 }
 
-export async function sendOtp(token: string, phone: string): Promise<void> {
-  await apiRequest<{ message: string }>("/auth/send-otp", {
+export async function requestPasswordReset(email: string): Promise<void> {
+  await apiRequest<{ message: string }>("/auth/forgot-password", {
     method: "POST",
-    headers: getAuthHeaders(token),
-    body: JSON.stringify({ phone: phone.trim() }),
+    body: JSON.stringify({ email: email.trim() }),
   });
 }
 
-export async function verifyOtp(token: string, code: string): Promise<User> {
-  return apiRequest<User>("/auth/verify-otp", {
+export async function resetPassword(email: string, code: string, newPassword: string): Promise<void> {
+  await apiRequest<{ message: string }>("/auth/reset-password", {
     method: "POST",
-    headers: getAuthHeaders(token),
-    body: JSON.stringify({ code }),
+    body: JSON.stringify({ email: email.trim(), code: code.trim(), newPassword }),
   });
 }
 

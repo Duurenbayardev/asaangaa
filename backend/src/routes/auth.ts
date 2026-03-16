@@ -5,9 +5,7 @@ import { validate } from "../middleware/validate";
 import { auth, requireUser } from "../middleware/auth";
 import { hashPassword } from "../utils/hash";
 import { signToken, getExpiresInSeconds } from "../utils/jwt";
-import { normalizeMongolianPhoneToE164, isValidE164 } from "../utils/phone";
-import { twilioSendOtp, twilioVerifyOtp } from "../utils/twilio-verify";
-import { sendOtpEmail } from "../utils/mail";
+import { sendOtpEmail, sendPasswordResetEmail } from "../utils/mail";
 
 const router = Router();
 
@@ -136,27 +134,28 @@ router.post(
   }
 );
 
-// ----- Phone verification (Twilio Verify) -----
+// ----- Forgot / Reset password -----
+const PASSWORD_RESET_CODE_EXPIRY_MINUTES = 15;
+
 router.post(
-  "/send-otp",
-  auth,
-  requireUser,
-  validate([body("phone").isString().notEmpty().withMessage("Phone number required")]),
+  "/forgot-password",
+  validate([body("email").isEmail().normalizeEmail()]),
   async (req, res, next) => {
     try {
-      const { phone } = req.body as { phone: string };
-      const to = normalizeMongolianPhoneToE164(phone);
-      if (!isValidE164(to)) {
-        res.status(400).json({ message: "Invalid phone number", code: "INVALID_PHONE" });
+      const { email } = req.body as { email: string };
+      const user = await prisma.user.findUnique({ where: { email } });
+      if (!user?.passwordHash) {
+        res.json({ message: "If an account exists, a code was sent to your email" });
         return;
       }
-      await twilioSendOtp(to);
-      // Persist phone on user so verify step can be only code-based (keeps frontend simple).
-      await prisma.user.update({
-        where: { id: req.userId! },
-        data: { phone: to },
+      const code = String(Math.floor(100000 + Math.random() * 900000));
+      const expiresAt = new Date(Date.now() + PASSWORD_RESET_CODE_EXPIRY_MINUTES * 60 * 1000);
+      await prisma.otpCode.deleteMany({ where: { userId: user.id } });
+      await prisma.otpCode.create({
+        data: { userId: user.id, code, expiresAt },
       });
-      res.json({ message: "OTP sent" });
+      await sendPasswordResetEmail(user.email, code);
+      res.json({ message: "If an account exists, a code was sent to your email" });
     } catch (e) {
       next(e);
     }
@@ -164,29 +163,35 @@ router.post(
 );
 
 router.post(
-  "/verify-otp",
-  auth,
-  requireUser,
-  validate([body("code").isString().trim().isLength({ min: 4, max: 10 }).withMessage("Code required")]),
+  "/reset-password",
+  validate([
+    body("email").isEmail().normalizeEmail(),
+    body("code").isString().trim().isLength({ min: 6, max: 6 }).withMessage("Code must be 6 digits"),
+    body("newPassword").isString().isLength({ min: 8 }).withMessage("Password must be at least 8 characters"),
+  ]),
   async (req, res, next) => {
     try {
-      const { code } = req.body as { code: string };
-      const me = await prisma.user.findUnique({ where: { id: req.userId! } });
-      const to = me?.phone ?? "";
-      if (!to || !isValidE164(to)) {
-        res.status(400).json({ message: "No phone number on account. Send OTP first.", code: "NO_PHONE" });
+      const { email, code, newPassword } = req.body as { email: string; code: string; newPassword: string };
+      const user = await prisma.user.findUnique({ where: { email } });
+      if (!user) {
+        res.status(400).json({ message: "Invalid or expired code", code: "INVALID_CODE" });
         return;
       }
-      const ok = await twilioVerifyOtp(to, code);
-      if (!ok) {
-        res.status(400).json({ message: "Invalid code", code: "INVALID_CODE" });
-        return;
-      }
-      const user = await prisma.user.update({
-        where: { id: req.userId! },
-        data: { emailVerified: true },
+      const record = await prisma.otpCode.findFirst({
+        where: { userId: user.id },
+        orderBy: { createdAt: "desc" },
       });
-      res.json(toUser(user));
+      if (!record || record.code !== code || record.expiresAt < new Date()) {
+        res.status(400).json({ message: "Invalid or expired code", code: "INVALID_CODE" });
+        return;
+      }
+      await prisma.otpCode.deleteMany({ where: { userId: user.id } });
+      const passwordHash = await hashPassword(newPassword);
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { passwordHash },
+      });
+      res.json({ message: "Password updated" });
     } catch (e) {
       next(e);
     }
