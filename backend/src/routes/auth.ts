@@ -98,7 +98,13 @@ router.post("/send-verification-email", auth, requireUser, async (req, res, next
     await prisma.otpCode.create({
       data: { userId: user.id, code, expiresAt },
     });
-    await sendOtpEmail(user.email, code);
+    try {
+      await sendOtpEmail(user.email, code);
+    } catch (mailErr) {
+      const message = mailErr instanceof Error ? mailErr.message : "Failed to send verification email.";
+      res.status(503).json({ message, code: "MAIL_SEND_FAILED" });
+      return;
+    }
     res.json({ message: "Verification code sent to your email" });
   } catch (e) {
     next(e);

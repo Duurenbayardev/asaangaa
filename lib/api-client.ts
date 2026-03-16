@@ -216,11 +216,14 @@ export async function apiRequest<T>(
       }
 
       if (res.status === 401) {
-        try {
-          const { triggerUnauthorized } = require("./auth-callback");
-          triggerUnauthorized();
-        } catch {
-          // ignore if auth-callback not set up
+        const isAuthAttempt = /\/auth\/(login|signup)$/i.test(path.replace(/\?.*$/, ""));
+        if (!isAuthAttempt) {
+          try {
+            const { triggerUnauthorized } = require("./auth-callback");
+            triggerUnauthorized();
+          } catch {
+            // ignore if auth-callback not set up
+          }
         }
       }
 
