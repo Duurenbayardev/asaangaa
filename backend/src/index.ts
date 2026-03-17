@@ -4,6 +4,8 @@ import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { config } from "./config";
+
+const uploadDir = config.uploadDir ? path.resolve(config.uploadDir) : path.join(process.cwd(), "uploads");
 import { errorHandler } from "./middleware/errorHandler";
 import authRoutes from "./routes/auth";
 import productRoutes from "./routes/products";
@@ -12,6 +14,7 @@ import basketRoutes from "./routes/basket";
 import wishlistRoutes from "./routes/wishlist";
 import orderRoutes from "./routes/orders";
 import uploadRoutes from "./routes/upload";
+import imageRoutes from "./routes/images";
 import ocrRoutes from "./routes/ocr";
 import adminRoutes from "./routes/admin";
 
@@ -51,7 +54,7 @@ app.use((req, res, next) => {
   return express.json({ limit: "256kb" })(req, res, next);
 });
 
-app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+app.use("/uploads", express.static(uploadDir));
 
 app.get("/health", (_req, res) => {
   res.json({ ok: true, env: config.nodeEnv });
@@ -64,13 +67,15 @@ app.use("/basket", basketRoutes);
 app.use("/wishlist", wishlistRoutes);
 app.use("/orders", orderRoutes);
 app.use("/upload", uploadRoutes);
+app.use("/images", imageRoutes);
 app.use("/ocr", ocrRoutes);
 app.use("/admin", adminRoutes);
 
 app.use(errorHandler);
 
-app.listen(config.server.port, () => {
-  console.log(`Server listening on port ${config.server.port} (${config.nodeEnv})`);
+const host = config.isProduction ? "0.0.0.0" : "0.0.0.0";
+app.listen(config.server.port, host, () => {
+  console.log(`Server listening on http://${host}:${config.server.port} (${config.nodeEnv})`);
 }).on("error", (err) => {
   console.error("Server error:", err);
   process.exit(1);

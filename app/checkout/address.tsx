@@ -1,4 +1,3 @@
-import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
@@ -21,15 +20,6 @@ export default function CheckoutAddressScreen() {
   const { token, isRestored } = useAuth();
   const { addresses, addAddress, setCheckoutAddress } = useGrocery();
 
-  useEffect(() => {
-    if (isRestored && !token) {
-      router.replace("/login");
-    }
-  }, [isRestored, token]);
-
-  if (isRestored && !token) {
-    return null;
-  }
   const [fullName, setFullName] = useState("");
   const [line1, setLine1] = useState("");
   const [line2, setLine2] = useState("");
@@ -39,6 +29,16 @@ export default function CheckoutAddressScreen() {
   const [selectedId, setSelectedId] = useState<string | null>(addresses[0]?.id ?? null);
   const [useNew, setUseNew] = useState(addresses.length === 0);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (isRestored && !token) {
+      router.replace("/?login=1");
+    }
+  }, [isRestored, token]);
+
+  if (isRestored && !token) {
+    return null;
+  }
 
   const canUseSaved = selectedId != null && addresses.length > 0 && !useNew;
   const canUseNew =

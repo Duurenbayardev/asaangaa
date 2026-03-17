@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
+  Modal,
   NativeSyntheticEvent,
   NativeScrollEvent,
   Pressable,
@@ -26,6 +27,41 @@ const CAROUSEL_ITEM_WIDTH = Dimensions.get("window").width;
 
 const THEME_PRIMARY = "#8C1A7A";
 
+function FullscreenImageViewer({
+  src,
+  visible,
+  onClose,
+}: {
+  src: string | null;
+  visible: boolean;
+  onClose: () => void;
+}) {
+  const uri = useResolvedImageUri(src ?? undefined) ?? undefined;
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <Pressable style={styles.fullscreenBackdrop} onPress={onClose}>
+        {uri ? (
+          <Image
+            source={{ uri }}
+            style={styles.fullscreenImage}
+            contentFit="contain"
+          />
+        ) : (
+          <View style={[styles.fullscreenImage, styles.imagePlaceholder]}>
+            <Ionicons name="image-outline" size={48} color="#CCC" />
+          </View>
+        )}
+      </Pressable>
+    </Modal>
+  );
+}
+
 function ProductCarouselSlide({
   src,
   index,
@@ -33,6 +69,7 @@ function ProductCarouselSlide({
   imageError,
   onLoad,
   onError,
+  onPress,
   styles: s,
 }: {
   src: string;
@@ -41,6 +78,7 @@ function ProductCarouselSlide({
   imageError: boolean;
   onLoad: (i: number) => void;
   onError: (i: number) => void;
+  onPress: () => void;
   styles: { heroImageWrap: object; heroImage: object; imagePlaceholder: object };
 }) {
   const uri = useResolvedImageUri(src) ?? undefined;
@@ -48,7 +86,7 @@ function ProductCarouselSlide({
   const failed = imageError;
   const showPlaceholder = !uri || failed || (uri && !loaded);
   return (
-    <View style={s.heroImageWrap}>
+    <Pressable style={s.heroImageWrap} onPress={onPress}>
       {uri && !failed ? (
         <Image
           source={{ uri }}
@@ -67,7 +105,7 @@ function ProductCarouselSlide({
           )}
         </View>
       ) : null}
-    </View>
+    </Pressable>
   );
 }
 
@@ -124,6 +162,8 @@ export default function ProductDetailScreen() {
   const [imageError, setImageError] = useState<Record<number, boolean>>({});
   const [heroIndex, setHeroIndex] = useState(0);
   const carouselRef = useRef<ScrollView>(null);
+  const [fullscreenSrc, setFullscreenSrc] = useState<string | null>(null);
+  const closeFullscreen = useCallback(() => setFullscreenSrc(null), []);
 
   // Reset image state when product or images change
   useEffect(() => {
@@ -192,6 +232,8 @@ export default function ProductDetailScreen() {
 
   if (!product) return null;
 
+  const heroSrc = product.images?.[heroIndex] ?? null;
+
   const handleIncrement = () => {
     if (quantity === 0) {
       addToBasket(product);
@@ -226,6 +268,12 @@ export default function ProductDetailScreen() {
     <View style={styles.container}>
       <BackButton />
 
+      <FullscreenImageViewer
+        src={fullscreenSrc}
+        visible={fullscreenSrc != null}
+        onClose={closeFullscreen}
+      />
+
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -256,6 +304,7 @@ export default function ProductDetailScreen() {
                 imageError={imageError[index]}
                 onLoad={onHeroImageLoad}
                 onError={onHeroImageError}
+                onPress={() => setFullscreenSrc(heroSrc ?? src)}
                 styles={styles}
               />
             ))
@@ -455,6 +504,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#F0F0F0",
+  },
+  fullscreenBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.92)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  fullscreenImage: {
+    width: "100%",
+    height: "100%",
   },
   loadingImageWrap: {
     alignItems: "center",

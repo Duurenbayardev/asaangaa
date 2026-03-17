@@ -5,12 +5,36 @@ import { validate } from "../middleware/validate";
 import { auth, requireUser } from "../middleware/auth";
 import { checkPayment, createInvoice, isQPayConfigured } from "../services/qpay";
 import { config } from "../config";
+import { sendAdminNewOrderEmail } from "../utils/mail";
 
 const router = Router();
 
 const TAX_RATE = 0.1;
 const DELIVERY_FREE_THRESHOLD = 30;
 const DELIVERY_FEE = 4.99;
+
+async function notifyAdminOrder(orderId: string): Promise<void> {
+  const to = config.admin.mail;
+  if (!to) return;
+
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { lines: true },
+  });
+  if (!order) return;
+
+  const address = order.addressSnapshot as { phone?: string; city?: string } | null;
+
+  await sendAdminNewOrderEmail(to, {
+    id: order.id,
+    status: String(order.status),
+    grandTotal: Number(order.grandTotal),
+    createdAtIso: order.createdAt.toISOString(),
+    items: order.lines.map((l) => ({ name: l.productName, qty: l.quantity })),
+    phone: address?.phone,
+    city: address?.city,
+  });
+}
 
 // QPay callback: no auth (QPay server calls this)
 router.post("/qpay-callback", async (req, res, next) => {
@@ -40,15 +64,16 @@ router.post("/qpay-callback", async (req, res, next) => {
       return;
     }
     const productIds = order.lines.map((l) => l.productId);
-    await prisma.$transaction([
-      prisma.order.update({
-        where: { id: order.id },
-        data: { status: "confirmed" },
-      }),
-      prisma.cartItem.deleteMany({
+    const updated = await prisma.order.updateMany({
+      where: { id: order.id, status: "pending_payment" },
+      data: { status: "confirmed" },
+    });
+    if (updated.count === 1) {
+      await prisma.cartItem.deleteMany({
         where: { userId: order.userId, productId: { in: productIds } },
-      }),
-    ]);
+      });
+      notifyAdminOrder(order.id).catch((e) => console.error("[Admin mail] notify failed:", e));
+    }
     res.json({ ok: true, paid: true, orderId: order.id });
   } catch (e) {
     next(e);
@@ -307,6 +332,9 @@ router.post(
         grandTotal: Number(order.grandTotal),
         createdAt: order.createdAt.toISOString(),
       });
+
+      // Notify admin for non-QPay orders (created successfully).
+      notifyAdminOrder(order.id).catch((e) => console.error("[Admin mail] notify failed:", e));
     } catch (e) {
       next(e);
     }
@@ -383,15 +411,16 @@ router.get("/:id/check-payment", async (req, res, next) => {
     const paid = check.rows?.some((r) => r.payment_status === "PAID");
     if (paid) {
       const productIds = order.lines.map((l) => l.productId);
-      await prisma.$transaction([
-        prisma.order.update({
-          where: { id: order.id },
-          data: { status: "confirmed" },
-        }),
-        prisma.cartItem.deleteMany({
+      const updated = await prisma.order.updateMany({
+        where: { id: order.id, status: "pending_payment" },
+        data: { status: "confirmed" },
+      });
+      if (updated.count === 1) {
+        await prisma.cartItem.deleteMany({
           where: { userId: order.userId, productId: { in: productIds } },
-        }),
-      ]);
+        });
+        notifyAdminOrder(order.id).catch((e) => console.error("[Admin mail] notify failed:", e));
+      }
       res.json({ status: "confirmed", paid: true });
       return;
     }

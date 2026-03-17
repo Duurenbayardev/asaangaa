@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import * as ImageManipulator from "expo-image-manipulator";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -21,6 +22,9 @@ import * as adminApi from "../../../lib/admin-api";
 import type { Product } from "../../../types/api";
 
 const THEME = "#8C1A7A";
+
+const UPLOAD_MAX_DIMENSION = 1280;
+const UPLOAD_JPEG_QUALITY = 0.72;
 
 export default function AdminProductScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -70,19 +74,38 @@ export default function AdminProductScreen() {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.8,
-      base64: true,
+      quality: 1,
     });
     if (result.canceled || !result.assets[0]) return;
     const asset = result.assets[0];
-    const base64 = (asset as { base64?: string }).base64;
-    if (!base64) {
-      Alert.alert("Алдаа", "Зургийн өгөгдөл авахад амжилтгүй. Дахин оролдоно уу.");
-      return;
-    }
-    const mime = asset.uri?.toLowerCase().includes(".png") ? "png" : "jpeg";
-    const dataUrl = `data:image/${mime};base64,${base64}`;
+
     try {
+      const targetWidth =
+        typeof asset.width === "number" && typeof asset.height === "number" && asset.width > asset.height
+          ? Math.min(asset.width, UPLOAD_MAX_DIMENSION)
+          : undefined;
+      const targetHeight =
+        typeof asset.width === "number" && typeof asset.height === "number" && asset.height >= asset.width
+          ? Math.min(asset.height, UPLOAD_MAX_DIMENSION)
+          : undefined;
+
+      const manipulated = await ImageManipulator.manipulateAsync(
+        asset.uri,
+        targetWidth || targetHeight ? [{ resize: { width: targetWidth, height: targetHeight } }] : [],
+        {
+          compress: UPLOAD_JPEG_QUALITY,
+          format: ImageManipulator.SaveFormat.JPEG,
+          base64: true,
+        }
+      );
+
+      if (!manipulated.base64) {
+        Alert.alert("Алдаа", "Зураг шахахад амжилтгүй. Дахин оролдоно уу.");
+        return;
+      }
+
+      const dataUrl = `data:image/jpeg;base64,${manipulated.base64}`;
+
       const url = await adminApi.uploadImageBase64(token, dataUrl);
       setImages((prev) => [...prev, url]);
     } catch (e) {
@@ -99,12 +122,18 @@ export default function AdminProductScreen() {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.8,
+      quality: 1,
     });
     if (result.canceled || !result.assets[0]) return;
     const asset = result.assets[0];
     try {
-      const text = await adminApi.ocrImage(token, { uri: asset.uri, type: "image/jpeg", name: "image.jpg" });
+      // Light compression before OCR to speed upload without harming accuracy much.
+      const manipulated = await ImageManipulator.manipulateAsync(
+        asset.uri,
+        [{ resize: { width: 1600 } }],
+        { compress: 0.85, format: ImageManipulator.SaveFormat.JPEG }
+      );
+      const text = await adminApi.ocrImage(token, { uri: manipulated.uri, type: "image/jpeg", name: "image.jpg" });
       if (text) setDescription((prev) => (prev ? prev + "\n" + text : text));
       else Alert.alert("Үр дүн", "Текст олдсонгүй.");
     } catch (e) {

@@ -53,10 +53,9 @@ export function resolveImageUri(value: string | undefined): string | Promise<str
   if (!value?.trim()) return undefined;
   const v = value.trim();
   if (v.startsWith("http://") || v.startsWith("https://")) return v;
-  if (v.startsWith("/") || v.startsWith("uploads/")) {
+  if (v.startsWith("/")) {
     const base = getApiBaseUrl().replace(/\/$/, "");
-    const path = v.startsWith("/") ? v : `/${v}`;
-    return `${base}${path}`;
+    return `${base}${v}`;
   }
   if (v.startsWith("data:") || (!v.startsWith("http") && !v.startsWith("/"))) {
     return resolveBase64ToFileUri(v.startsWith("data:") ? v : `data:image/jpeg;base64,${v}`);
@@ -67,7 +66,7 @@ export function resolveImageUri(value: string | undefined): string | Promise<str
 export function isBase64OrDataUri(value: string | undefined): boolean {
   if (!value?.trim()) return false;
   const v = value.trim();
-  return v.startsWith("data:") || (!v.startsWith("http://") && !v.startsWith("https://") && !v.startsWith("/") && !v.startsWith("uploads/"));
+  return v.startsWith("data:") || (!v.startsWith("http://") && !v.startsWith("https://") && !v.startsWith("/"));
 }
 
 /**

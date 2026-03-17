@@ -33,6 +33,7 @@ export interface LoginBody {
 export interface SignUpBody {
   email: string;
   password: string;
+  passwordConfirm?: string;
   name?: string;
 }
 

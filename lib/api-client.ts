@@ -1,5 +1,6 @@
 /**
  * Base API client for backend. Set EXPO_PUBLIC_API_URL in .env or app.config.
+ * Default: http://localhost:3000 (local). For production/EAS set EXPO_PUBLIC_API_URL to your deployed backend.
  * Android emulator: use http://10.0.2.2:3000
  * Physical device: use your machine IP, e.g. http://192.168.1.x:3000
  */
@@ -27,7 +28,7 @@ function readBaseUrlFromEnv(): string {
       return fromExtra.replace(/\/$/, "");
     }
   } catch (_) {}
-  return "https://asaangaa.onrender.com";
+  return "http://localhost:3000";
 }
 
 // Resolved on first use so env/constants are ready when images resolve (fixes wrong base URL)
@@ -105,10 +106,10 @@ export async function parseJsonResponse(res: Response): Promise<unknown> {
     const url = (res as Response & { url?: string }).url ?? getApiBaseUrl();
     const hint =
       res.status === 404
-        ? " The route may not exist (redeploy backend?)."
+        ? " The route may not exist. Is your local backend running?"
         : res.status >= 500
-          ? " Backend may be down or sleeping (e.g. Render free tier – wait ~30s and retry)."
-          : " Check that EXPO_PUBLIC_API_URL points to your backend only (e.g. https://asaangaa.onrender.com).";
+          ? " Backend may be down. Is your local server running (e.g. npm run dev in backend)?"
+          : " Check EXPO_PUBLIC_API_URL in .env (e.g. http://localhost:3000 or http://YOUR_IP:3000).";
     throw {
       message: `Server returned HTML instead of JSON (status ${res.status}).${hint} URL: ${url}`,
       code: "INVALID_RESPONSE",
@@ -216,14 +217,11 @@ export async function apiRequest<T>(
       }
 
       if (res.status === 401) {
-        const isAuthAttempt = /\/auth\/(login|signup)$/i.test(path.replace(/\?.*$/, ""));
-        if (!isAuthAttempt) {
-          try {
-            const { triggerUnauthorized } = require("./auth-callback");
-            triggerUnauthorized();
-          } catch {
-            // ignore if auth-callback not set up
-          }
+        try {
+          const { triggerUnauthorized } = require("./auth-callback");
+          triggerUnauthorized();
+        } catch {
+          // ignore if auth-callback not set up
         }
       }
 

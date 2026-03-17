@@ -12,11 +12,9 @@ type AuthContextValue = {
   isLoading: boolean;
   isRestored: boolean;
   login: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, name?: string) => Promise<void>;
+  signUp: (email: string, password: string, passwordConfirm: string, name?: string) => Promise<void>;
   sendVerificationEmail: () => Promise<void>;
   verifyEmail: (code: string) => Promise<void>;
-  requestPasswordReset: (email: string) => Promise<void>;
-  resetPassword: (email: string, code: string, newPassword: string) => Promise<void>;
   logout: () => void;
   setToken: (t: string | null) => void;
   setUser: (u: User | null) => void;
@@ -93,10 +91,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const signUp = useCallback(
-    async (email: string, password: string, name?: string) => {
+    async (email: string, password: string, passwordConfirm: string, name?: string) => {
       setIsLoading(true);
       try {
-        const data = await authApi.signUp({ email, password, name });
+        const data = await authApi.signUp({ email, password, passwordConfirm, name });
         setTokenState(data.accessToken);
         setUser(data.user);
         await persistAuth(data.accessToken, data.user);
@@ -117,38 +115,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [token]);
 
-  const verifyEmail = useCallback(
-    async (code: string) => {
-      if (!token) return;
-      setIsLoading(true);
-      try {
-        const updated = await authApi.verifyEmail(token, code);
-        setUser(updated);
-        await persistAuth(token, updated);
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [token, persistAuth]
-  );
-
-  const requestPasswordReset = useCallback(async (email: string) => {
+  const verifyEmail = useCallback(async (code: string) => {
+    if (!token) return;
     setIsLoading(true);
     try {
-      await authApi.requestPasswordReset(email);
+      const updated = await authApi.verifyEmailWithCode(token, code);
+      setUser(updated);
     } finally {
       setIsLoading(false);
     }
-  }, []);
-
-  const resetPassword = useCallback(async (email: string, code: string, newPassword: string) => {
-    setIsLoading(true);
-    try {
-      await authApi.resetPassword(email, code, newPassword);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  }, [token]);
 
   const logout = useCallback(() => {
     clearStoredAuth();
@@ -170,14 +146,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signUp,
       sendVerificationEmail,
       verifyEmail,
-      requestPasswordReset,
-      resetPassword,
       logout,
       setToken,
       setUser,
       getAuthHeaders,
     }),
-    [token, user, isLoading, isRestored, login, signUp, sendVerificationEmail, verifyEmail, requestPasswordReset, resetPassword, logout, setToken, setUser, getAuthHeaders]
+    [token, user, isLoading, isRestored, login, signUp, sendVerificationEmail, verifyEmail, logout, setToken, setUser, getAuthHeaders]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,104 +1,119 @@
-import dns from "dns";
 import nodemailer from "nodemailer";
 import { Resend } from "resend";
 import { config } from "../config";
 
-const CONNECTION_TIMEOUT_MS = 15000;
+let transporter: nodemailer.Transporter | null = null;
 
-let transporterPromise: Promise<nodemailer.Transporter | null> | null = null;
-
-/** Get SMTP transporter, resolving host to IPv4 to avoid ENETUNREACH on hosts without IPv6 (e.g. Render). */
-async function getTransporter(): Promise<nodemailer.Transporter | null> {
-  if (transporterPromise !== null) return transporterPromise;
+function getTransporter(): nodemailer.Transporter | null {
+  if (transporter !== null) return transporter;
   const { host, port, user, pass } = config.mail;
   if (!host || !user || !pass) return null;
-  let resolvedHost = host;
-  try {
-    const result = await dns.promises.lookup(host, { family: 4 });
-    resolvedHost = result.address;
-  } catch {
-    // keep original host if DNS lookup fails
-  }
-  const portNum = port ?? 587;
-  transporterPromise = Promise.resolve(
-    nodemailer.createTransport({
-      host: resolvedHost,
-      port: portNum,
-      secure: port === 465,
-      auth: { user, pass },
-      tls: { servername: host },
-      connectionTimeout: CONNECTION_TIMEOUT_MS,
-      greetingTimeout: CONNECTION_TIMEOUT_MS,
-    })
-  );
-  return transporterPromise;
+  transporter = nodemailer.createTransport({
+    host,
+    port: port ?? 587,
+    secure: port === 465,
+    auth: { user, pass },
+  });
+  return transporter;
 }
 
-async function sendViaResend(to: string, subject: string, html: string, text: string): Promise<void> {
-  const apiKey = config.mail.resendApiKey;
-  if (!apiKey) throw new Error("RESEND_API_KEY not set");
-  const resend = new Resend(apiKey);
+const SUBJECT = "Имэйл баталгаажуулах код - Asaangaa";
+const textBody = (code: string) =>
+  `Таны бүртгэл баталгаажуулах код: ${code}\n\n Энэ кодыг 15 минутын дотор оруулна уу. `;
+const htmlBody = (code: string) =>
+  `<p>Таны бүртгэл баталгаажуулах код: <strong>${code}</strong></p><p>Энэ кодыг 15 минутын дотор оруулна уу.</p>`;
+
+type SendEmailInput = {
+  to: string;
+  subject: string;
+  text?: string;
+  html?: string;
+};
+
+async function sendEmail({ to, subject, text, html }: SendEmailInput): Promise<void> {
   const from = config.mail.from;
-  const { error } = await resend.emails.send({ from, to, subject, html, text });
-  if (error) throw new Error(error.message);
-}
-
-/** Send OTP email. Uses Resend if RESEND_API_KEY is set (recommended on Render); otherwise SMTP. If neither works, logs code (dev). */
-export async function sendOtpEmail(to: string, code: string): Promise<void> {
-  const subject = "Таны баталгаажуулах код - Asaangaa";
-  const text = `Таны имэйл баталгаажуулах код: ${code}\n\nЭнэ кодыг хэнд ч хэлэхгүй байна.`;
-  const html = `<p>Таны имэйл баталгаажуулах код: <strong>${code}</strong></p><p>Энэ кодыг хэнд ч хэлэхгүй байна.</p>`;
 
   if (config.mail.resendApiKey) {
-    try {
-      await sendViaResend(to, subject, html, text);
-      return;
-    } catch (err) {
-      console.error("[Mail] Resend sendOtpEmail failed:", err);
-      throw new Error("Failed to send verification email. Check Resend API key or try again later.");
+    const resend = new Resend(config.mail.resendApiKey);
+    const fromAddress =
+      from.endsWith(".local") || from === "noreply@asaangaa.local"
+        ? "Asaangaa <onboarding@resend.dev>"
+        : (from.includes("<") ? from : `Asaangaa <${from}>`);
+    // Resend SDK types can be overly strict across versions (some require `react`),
+    // but the API accepts html/text payloads. Cast to avoid TS mismatch.
+    const { error } = await resend.emails.send({
+      from: fromAddress,
+      to: [to],
+      subject,
+      html: html ?? (text ? `<pre>${escapeHtml(text)}</pre>` : undefined),
+      text,
+    } as unknown as Parameters<typeof resend.emails.send>[0]);
+    if (error) {
+      console.error("[Mail] Resend failed:", error);
+      throw error;
     }
-  }
-
-  const trans = await getTransporter();
-  if (!trans) {
-    console.log("[Mail] OTP (no SMTP):", { to, code });
     return;
   }
-  const from = config.mail.from;
-  try {
-    await trans.sendMail({ from, to, subject, text, html });
-  } catch (err) {
-    console.error("[Mail] sendOtpEmail failed:", err);
-    throw new Error("Failed to send verification email. Check SMTP settings or try again later.");
+
+  const trans = getTransporter();
+  if (!trans) {
+    console.log("[Mail] Email (no SMTP/Resend):", { to, subject, text });
+    return;
   }
+  await trans.sendMail({ from, to, subject, text, html });
 }
 
-/** Send password reset code. Uses Resend if RESEND_API_KEY is set; otherwise SMTP. */
-export async function sendPasswordResetEmail(to: string, code: string): Promise<void> {
-  const subject = "Нууц үг сэргээх код - Asaangaa";
-  const text = `Таны нууц үг сэргээх код: ${code}\n\nЭнэ кодыг 15 минутын дотор ашиглана уу. Хэнд ч хэлэхгүй байна.`;
-  const html = `<p>Таны нууц үг сэргээх код: <strong>${code}</strong></p><p>Энэ кодыг 15 минутын дотор ашиглана уу. Хэнд ч хэлэхгүй байна.</p>`;
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
 
-  if (config.mail.resendApiKey) {
-    try {
-      await sendViaResend(to, subject, html, text);
-      return;
-    } catch (err) {
-      console.error("[Mail] Resend sendPasswordResetEmail failed:", err);
-      throw new Error("Failed to send password reset email. Check Resend API key or try again later.");
-    }
-  }
+/** Send email verification code. Uses Resend API if RESEND_API_KEY is set (works on Render); else SMTP; else logs (dev). */
+export async function sendVerificationCodeEmail(to: string, code: string): Promise<void> {
+  await sendEmail({
+    to,
+    subject: SUBJECT,
+    text: textBody(code),
+    html: htmlBody(code),
+  });
+}
 
-  const trans = await getTransporter();
-  if (!trans) {
-    console.log("[Mail] Password reset (no SMTP):", { to, code });
-    return;
-  }
-  const from = config.mail.from;
-  try {
-    await trans.sendMail({ from, to, subject, text, html });
-  } catch (err) {
-    console.error("[Mail] sendPasswordResetEmail failed:", err);
-    throw new Error("Failed to send password reset email. Check SMTP settings or try again later.");
-  }
+export type AdminOrderEmailData = {
+  id: string;
+  status: string;
+  grandTotal: number;
+  createdAtIso: string;
+  items: Array<{ name: string; qty: number }>;
+  phone?: string;
+  city?: string;
+};
+
+export async function sendAdminNewOrderEmail(to: string, data: AdminOrderEmailData): Promise<void> {
+  const shortId = data.id.slice(-8).toUpperCase();
+  const subject = `Шинэ захиалга #${shortId} (${data.status})`;
+  const lines = data.items.map((i) => `- ${i.name} × ${i.qty}`).join("\n");
+  const text =
+    `Шинэ захиалга ирлээ.\n\n` +
+    `Дугаар: #${shortId}\n` +
+    `Төлөв: ${data.status}\n` +
+    `Нийт: ${data.grandTotal}\n` +
+    (data.phone ? `Утас: ${data.phone}\n` : "") +
+    (data.city ? `Хот/Аймаг: ${data.city}\n` : "") +
+    `Огноо: ${data.createdAtIso}\n\n` +
+    `Бараа:\n${lines}\n`;
+
+  const html =
+    `<h3>Шинэ захиалга ирлээ</h3>` +
+    `<p><strong>Дугаар:</strong> #${shortId}</p>` +
+    `<p><strong>Төлөв:</strong> ${escapeHtml(data.status)}</p>` +
+    `<p><strong>Нийт:</strong> ${data.grandTotal}</p>` +
+    (data.phone ? `<p><strong>Утас:</strong> ${escapeHtml(data.phone)}</p>` : "") +
+    (data.city ? `<p><strong>Хот/Аймаг:</strong> ${escapeHtml(data.city)}</p>` : "") +
+    `<p><strong>Огноо:</strong> ${escapeHtml(data.createdAtIso)}</p>` +
+    `<p><strong>Бараа:</strong></p>` +
+    `<ul>${data.items.map((i) => `<li>${escapeHtml(i.name)} × ${i.qty}</li>`).join("")}</ul>`;
+
+  await sendEmail({ to, subject, text, html });
 }

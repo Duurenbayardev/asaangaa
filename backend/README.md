@@ -95,6 +95,16 @@ Production-ready Node + Express + Prisma + PostgreSQL API for the Asanga app.
 
 Do **not** use `node expo-router/entry` — that is the Expo frontend entry and will fail in the backend directory. A `render.yaml` in the repo root is configured for this backend service.
 
+### Product images (recommended)
+
+This backend stores uploaded images **inside PostgreSQL** (table `product_images`) and serves them at:
+
+- `GET /images/:id` → returns image bytes with the correct `Content-Type`
+
+The upload endpoints return a stable path like `/images/<id>`, which you store in `product.images[]`.
+
+This avoids Render’s ephemeral filesystem issue (no persistent disk needed). Existing products that referenced old `/uploads/...` files will still show placeholders until you re-upload those images.
+
 ## Production checklist
 
 1. Set `NODE_ENV=production`

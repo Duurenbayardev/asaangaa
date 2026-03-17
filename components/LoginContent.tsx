@@ -32,146 +32,6 @@ export function LoginContent({ onContinue, showHeader = false, onHeroImageLoad }
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [showForgotPassword, setShowForgotPassword] = useState(false);
-  const [forgotStep, setForgotStep] = useState<"email" | "code">("email");
-  const [forgotEmail, setForgotEmail] = useState("");
-  const [forgotCode, setForgotCode] = useState("");
-  const [forgotNewPassword, setForgotNewPassword] = useState("");
-  const [forgotConfirmPassword, setForgotConfirmPassword] = useState("");
-  const [forgotSuccess, setForgotSuccess] = useState(false);
-
-  if (showForgotPassword) {
-    return (
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
-        <View style={styles.hero} />
-        <Image source={require("../assets/Group 3.png")} style={styles.heroImage} resizeMode="contain" />
-        <View style={styles.formSection}>
-          <ScrollView
-            contentContainerStyle={styles.formScroll}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
-            <Text style={styles.title}>Нууц үг сэргээх</Text>
-            <Text style={styles.subtitle}>
-              {forgotSuccess
-                ? "Нууц үг амжилттай солигдлоо. Одоо нэвтрэнэ үү."
-                : forgotStep === "email"
-                  ? "И-мэйл хаягаа оруулбал баталгаажуулах код илгээнэ."
-                  : "Имэйлээр ирсэн 6 оронтой кодыг болон шинэ нууц үгээ оруулна уу."}
-            </Text>
-
-            {forgotSuccess ? (
-              <TouchableOpacity
-                style={styles.primaryButton}
-                onPress={() => { setShowForgotPassword(false); setForgotStep("email"); setForgotEmail(""); setForgotCode(""); setForgotSuccess(false); }}
-              >
-                <Text style={styles.primaryButtonText}>Нэвтрэх рүү буцах</Text>
-              </TouchableOpacity>
-            ) : forgotStep === "email" ? (
-              <>
-                <Text style={styles.label}>И-мэйл</Text>
-                <TextInput
-                  placeholder="имэйл@жишээ.com"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  style={styles.input}
-                  placeholderTextColor="#B0B0B0"
-                  value={forgotEmail}
-                  onChangeText={(t) => { setForgotEmail(t); setError(null); }}
-                />
-                {error ? <Text style={styles.errorText}>{error}</Text> : null}
-                <TouchableOpacity
-                  style={[styles.primaryButton, styles.secondaryButtonMargin, auth.isLoading && styles.primaryButtonDisabled]}
-                  onPress={async () => {
-                    setError(null);
-                    if (!forgotEmail.trim()) {
-                      setError("И-мэйлээ оруулна уу.");
-                      return;
-                    }
-                    try {
-                      await auth.requestPasswordReset(forgotEmail.trim());
-                      setForgotStep("code");
-                    } catch (e: unknown) {
-                      setError(e && typeof e === "object" && "message" in e ? String((e as { message: string }).message) : "Код илгээхэд алдаа гарлаа.");
-                    }
-                  }}
-                  disabled={auth.isLoading}
-                >
-                  {auth.isLoading ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Text style={styles.primaryButtonText}>Код илгээх</Text>}
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.linkButton} onPress={() => { setShowForgotPassword(false); setError(null); }}>
-                  <Text style={styles.linkText}>Нэвтрэх рүү буцах</Text>
-                </TouchableOpacity>
-              </>
-            ) : (
-              <>
-                <Text style={styles.label}>И-мэйл</Text>
-                <Text style={[styles.input, styles.inputReadOnly]}>{forgotEmail}</Text>
-                <Text style={[styles.label, styles.labelSpacing]}>Код</Text>
-                <TextInput
-                  placeholder="000000"
-                  keyboardType="number-pad"
-                  style={styles.input}
-                  placeholderTextColor="#B0B0B0"
-                  value={forgotCode}
-                  onChangeText={(t) => { setForgotCode(t.replace(/\D/g, "").slice(0, 6)); setError(null); }}
-                  maxLength={6}
-                />
-                <Text style={[styles.label, styles.labelSpacing]}>Шинэ нууц үг</Text>
-                <TextInput
-                  placeholder="••••••••"
-                  secureTextEntry
-                  style={styles.input}
-                  placeholderTextColor="#B0B0B0"
-                  value={forgotNewPassword}
-                  onChangeText={(t) => { setForgotNewPassword(t); setError(null); }}
-                />
-                <Text style={[styles.label, styles.labelSpacing]}>Нууц үг давтах</Text>
-                <TextInput
-                  placeholder="••••••••"
-                  secureTextEntry
-                  style={styles.input}
-                  placeholderTextColor="#B0B0B0"
-                  value={forgotConfirmPassword}
-                  onChangeText={(t) => { setForgotConfirmPassword(t); setError(null); }}
-                />
-                {error ? <Text style={styles.errorText}>{error}</Text> : null}
-                <TouchableOpacity
-                  style={[styles.primaryButton, styles.secondaryButtonMargin, (auth.isLoading || forgotCode.length !== 6 || forgotNewPassword.length < 8 || forgotNewPassword !== forgotConfirmPassword) && styles.primaryButtonDisabled]}
-                  onPress={async () => {
-                    setError(null);
-                    if (forgotNewPassword.length < 8) {
-                      setError("Нууц үг 8 тэмдэгтээс дээш байх ёстой.");
-                      return;
-                    }
-                    if (forgotNewPassword !== forgotConfirmPassword) {
-                      setError("Нууц үг тохирохгүй байна.");
-                      return;
-                    }
-                    try {
-                      await auth.resetPassword(forgotEmail.trim(), forgotCode, forgotNewPassword);
-                      setForgotSuccess(true);
-                    } catch (e: unknown) {
-                      setError(e && typeof e === "object" && "message" in e ? String((e as { message: string }).message) : "Код буруу эсвэл хугацаа дууссан.");
-                    }
-                  }}
-                  disabled={auth.isLoading || forgotCode.length !== 6 || forgotNewPassword.length < 8 || forgotNewPassword !== forgotConfirmPassword}
-                >
-                  {auth.isLoading ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Text style={styles.primaryButtonText}>Нууц үг солих</Text>}
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.linkButton} onPress={() => { setForgotStep("email"); setForgotCode(""); setError(null); }}>
-                  <Text style={styles.linkText}>Өөр имэйл ашиглах</Text>
-                </TouchableOpacity>
-              </>
-            )}
-          </ScrollView>
-        </View>
-      </KeyboardAvoidingView>
-    );
-  }
 
   return (
     <KeyboardAvoidingView
@@ -228,6 +88,9 @@ export function LoginContent({ onContinue, showHeader = false, onHeroImageLoad }
                 placeholderTextColor="#B0B0B0"
                 value={name}
                 onChangeText={setName}
+                editable
+                underlineColorAndroid="transparent"
+                selectionColor={THEME_PRIMARY}
               />
               <View style={styles.labelSpacing} />
             </>
@@ -238,10 +101,14 @@ export function LoginContent({ onContinue, showHeader = false, onHeroImageLoad }
             placeholder="имэйл@жишээ.com"
             keyboardType="email-address"
             autoCapitalize="none"
+            autoCorrect={false}
             style={styles.input}
             placeholderTextColor="#B0B0B0"
             value={email}
             onChangeText={setEmail}
+            editable
+            underlineColorAndroid="transparent"
+            selectionColor={THEME_PRIMARY}
           />
 
           <Text style={[styles.label, styles.labelSpacing]}>Нууц үг</Text>
@@ -252,6 +119,9 @@ export function LoginContent({ onContinue, showHeader = false, onHeroImageLoad }
             placeholderTextColor="#B0B0B0"
             value={password}
             onChangeText={(t) => { setPassword(t); setError(null); }}
+            editable
+            underlineColorAndroid="transparent"
+            selectionColor={THEME_PRIMARY}
           />
 
           {isSignUp && (
@@ -264,6 +134,9 @@ export function LoginContent({ onContinue, showHeader = false, onHeroImageLoad }
                 placeholderTextColor="#B0B0B0"
                 value={passwordConfirm}
                 onChangeText={(t) => { setPasswordConfirm(t); setError(null); }}
+                editable
+                underlineColorAndroid="transparent"
+                selectionColor={THEME_PRIMARY}
               />
             </>
           )}
@@ -284,19 +157,17 @@ export function LoginContent({ onContinue, showHeader = false, onHeroImageLoad }
                 setError("Нууц үгээ оруулна уу.");
                 return;
               }
-              if (isSignUp) {
-                if (password.length < 8) {
-                  setError("Нууц үг 8 тэмдэгтээс дээш байх ёстой.");
-                  return;
-                }
-                if (password !== passwordConfirm) {
-                  setError("Нууц үг тохирохгүй байна.");
-                  return;
-                }
+              if (isSignUp && password.length < 8) {
+                setError("Нууц үг 8 тэмдэгтээс дээш байх ёстой.");
+                return;
+              }
+              if (isSignUp && password !== passwordConfirm) {
+                setError("Нууц үг тохирохгүй байна.");
+                return;
               }
               try {
                 if (isSignUp) {
-                  await auth.signUp(email.trim(), password, name.trim() || undefined);
+                  await auth.signUp(email.trim(), password, passwordConfirm, name.trim() || undefined);
                 } else {
                   await auth.login(email.trim(), password);
                 }
@@ -318,12 +189,6 @@ export function LoginContent({ onContinue, showHeader = false, onHeroImageLoad }
               </Text>
             )}
           </TouchableOpacity>
-
-          {!isSignUp && (
-            <TouchableOpacity style={styles.linkButton} onPress={() => setShowForgotPassword(true)}>
-              <Text style={styles.linkText}>Нууц үгээ мартсан уу?</Text>
-            </TouchableOpacity>
-          )}
         </ScrollView>
       </View>
     </KeyboardAvoidingView>
@@ -430,21 +295,6 @@ const styles = StyleSheet.create({
   },
   primaryButtonDisabled: {
     opacity: 0.7,
-  },
-  secondaryButtonMargin: {
-    marginTop: 20,
-  },
-  linkButton: {
-    marginTop: 16,
-    alignItems: "center",
-  },
-  linkText: {
-    fontSize: 15,
-    fontWeight: "500",
-    color: THEME_PRIMARY,
-  },
-  inputReadOnly: {
-    color: "#666",
   },
   errorText: {
     marginTop: 12,

@@ -46,10 +46,8 @@ export const config = {
     resendApiKey: process.env.RESEND_API_KEY ?? "",
   },
 
-  twilio: {
-    accountSid: process.env.TWILIO_ACCOUNT_SID ?? "",
-    authToken: process.env.TWILIO_AUTH_TOKEN ?? "",
-    verifyServiceSid: process.env.TWILIO_VERIFY_SERVICE_SID ?? "",
+  admin: {
+    mail: (process.env.ADMIN_MAIL ?? "").trim(),
   },
 
   qpay: {
@@ -59,6 +57,9 @@ export const config = {
     invoiceCode: (process.env.QPAY_INVOICE_CODE ?? "").trim(),
     callbackBaseUrl: (process.env.QPAY_CALLBACK_BASE_URL ?? "").trim().replace(/\/$/, ""),
   },
+
+  /** Directory for product image uploads. Use a persistent path (e.g. Render Disk) in production so images survive restarts. */
+  uploadDir: process.env.UPLOAD_DIR ?? undefined,
 };
 
 if (config.jwt.secret.length < 32 && config.isProduction) {

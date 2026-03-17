@@ -1,4 +1,4 @@
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
   Animated,
@@ -43,12 +43,14 @@ const SLIDES = [
 ];
 
 export default function Index() {
+  const params = useLocalSearchParams<{ login?: string }>();
   const { token, isRestored } = useAuth();
-  const [current, setCurrent] = useState(0);
-  const [showLogin, setShowLogin] = useState(false);
-  const [loginImageReady, setLoginImageReady] = useState(false);
+  const openLoginFromParam = params.login === "1";
+  const [current, setCurrent] = useState(openLoginFromParam ? SLIDES.length - 1 : 0);
+  const [showLogin, setShowLogin] = useState(openLoginFromParam);
+  const [loginImageReady, setLoginImageReady] = useState(openLoginFromParam);
   const scrollRef = useRef<ScrollView | null>(null);
-  const slideAnim = useRef(new Animated.Value(-SCREEN_HEIGHT)).current;
+  const slideAnim = useRef(new Animated.Value(openLoginFromParam ? 0 : -SCREEN_HEIGHT)).current;
   const slideFadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -57,6 +59,14 @@ export default function Index() {
       router.replace("/(tabs)/home");
     }
   }, [isRestored, token]);
+
+  useEffect(() => {
+    if (!openLoginFromParam) return;
+    const t = setTimeout(() => {
+      scrollRef.current?.scrollTo({ x: (SLIDES.length - 1) * width, animated: false });
+    }, 50);
+    return () => clearTimeout(t);
+  }, [openLoginFromParam, isRestored]);
 
   useEffect(() => {
     Animated.timing(slideFadeAnim, {
@@ -179,7 +189,7 @@ export default function Index() {
               transform: [{ translateY: slideAnim }],
             },
           ]}
-          pointerEvents="box-none"
+          pointerEvents="auto"
         >
           <LoginContent onContinue={handleLoginContinue} onHeroImageLoad={() => setLoginImageReady(true)} />
         </Animated.View>
