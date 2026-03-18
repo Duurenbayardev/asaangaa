@@ -6,13 +6,18 @@ import { validate } from "../middleware/validate";
 import { auth, requireUser } from "../middleware/auth";
 import { hashPassword } from "../utils/hash";
 import { signToken, getExpiresInSeconds } from "../utils/jwt";
-import { sendVerificationCodeEmail } from "../utils/mail";
+import { sendPasswordResetCodeEmail, sendVerificationCodeEmail } from "../utils/mail";
 
 const router = Router();
 
 const EMAIL_VERIFICATION_CODE_EXPIRY_MINUTES = 15;
+const PASSWORD_RESET_CODE_EXPIRY_MINUTES = 15;
 
 function generateVerificationCode(): string {
+  return randomInt(100000, 999999).toString();
+}
+
+function generatePasswordResetCode(): string {
   return randomInt(100000, 999999).toString();
 }
 
@@ -153,6 +158,70 @@ router.post(
         data: { emailVerified: true },
       });
       res.json(toUser(user));
+    } catch (e) {
+      next(e);
+    }
+  }
+);
+
+// Request a password reset code (emailed). Always returns 200 to avoid leaking which emails exist.
+router.post(
+  "/forgot-password",
+  validate([body("email").isEmail().normalizeEmail()]),
+  async (req, res, next) => {
+    try {
+      const { email } = req.body as { email: string };
+      const user = await prisma.user.findUnique({ where: { email } });
+      if (user) {
+        await prisma.passwordResetCode.deleteMany({ where: { userId: user.id } });
+        const code = generatePasswordResetCode();
+        const expiresAt = new Date(Date.now() + PASSWORD_RESET_CODE_EXPIRY_MINUTES * 60 * 1000);
+        await prisma.passwordResetCode.create({
+          data: { userId: user.id, code, expiresAt },
+        });
+        // Respond before SMTP — slow/hanging mail was causing client "request timed out".
+        const emailTo = user.email;
+        void sendPasswordResetCodeEmail(emailTo, code).catch((err) => {
+          console.error("[auth] forgot-password email failed:", err);
+        });
+      }
+      res.json({ message: "If the email exists, a reset code was sent." });
+    } catch (e) {
+      next(e);
+    }
+  }
+);
+
+router.post(
+  "/reset-password",
+  validate([
+    body("email").isEmail().normalizeEmail(),
+    body("code").isString().trim().isLength({ min: 6, max: 6 }).withMessage("Code must be 6 digits"),
+    body("newPassword").isString().isLength({ min: 8 }).withMessage("Password must be at least 8 characters"),
+  ]),
+  async (req, res, next) => {
+    try {
+      const { email, code, newPassword } = req.body as { email: string; code: string; newPassword: string };
+      const user = await prisma.user.findUnique({ where: { email } });
+      if (!user) {
+        res.status(400).json({ message: "Invalid or expired code", code: "INVALID_CODE" });
+        return;
+      }
+      const record = await prisma.passwordResetCode.findFirst({
+        where: { userId: user.id, code, usedAt: null },
+        orderBy: { createdAt: "desc" },
+      });
+      if (!record || record.expiresAt < new Date()) {
+        res.status(400).json({ message: "Invalid or expired code", code: "INVALID_CODE" });
+        return;
+      }
+      const passwordHash = await hashPassword(newPassword);
+      await prisma.$transaction([
+        prisma.user.update({ where: { id: user.id }, data: { passwordHash } }),
+        prisma.passwordResetCode.update({ where: { id: record.id }, data: { usedAt: new Date() } }),
+        prisma.passwordResetCode.deleteMany({ where: { userId: user.id, id: { not: record.id } } }),
+      ]);
+      res.json({ message: "Password reset successfully" });
     } catch (e) {
       next(e);
     }

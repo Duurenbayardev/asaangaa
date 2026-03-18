@@ -3,27 +3,28 @@ import Constants from "expo-constants";
 import { router } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Alert,
-  Image,
-  Linking,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Alert,
+    Image,
+    Linking,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { BackButton } from "../../components/BackButton";
 import { useAuth } from "../../context/AuthContext";
 import { useGrocery } from "../../context/GroceryContext";
 import { formatTugrug } from "../../lib/formatCurrency";
 import {
-  checkOrderPayment,
-  createOrderWithQPay,
-  getOrder,
-  type CreateOrderResponse,
-  type CreateOrderWithQPayResponse,
+    checkOrderPayment,
+    createOrder,
+    createOrderWithQPay,
+    getOrder,
+    type CreateOrderResponse,
+    type CreateOrderWithQPayResponse,
 } from "../../lib/orders-api";
 
 const THEME_PRIMARY = "#8C1A7A";
@@ -248,12 +249,27 @@ export default function CheckoutConfirmScreen() {
     }
     setSubmitting(true);
     try {
-      const result = await createOrderWithQPay(token, {
-        addressId: checkoutAddress.id,
-        phone: phoneTrim,
-        itemIds: checkoutItems.map((i) => i.product.id),
-      });
-      setPaymentState(result);
+      // Admin can create an order without payment (skip QPay).
+      if (user?.role === "admin") {
+        const result = await createOrder(token, {
+          addressId: checkoutAddress.id,
+          phone: phoneTrim,
+          itemIds: checkoutItems.map((i) => i.product.id),
+        });
+        removeCheckoutItemsFromBasket(checkoutItems ?? []);
+        setCheckoutItems(null);
+        setCheckoutAddress(null);
+        setOrderResult(result);
+        setPaymentState(null);
+        setShowOrderSuccess(true);
+      } else {
+        const result = await createOrderWithQPay(token, {
+          addressId: checkoutAddress.id,
+          phone: phoneTrim,
+          itemIds: checkoutItems.map((i) => i.product.id),
+        });
+        setPaymentState(result);
+      }
     } catch (e: unknown) {
       const err = e as { message?: string; code?: string };
       const message =
@@ -428,10 +444,18 @@ export default function CheckoutConfirmScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.successCenter}>
-            <Text style={styles.successTitle}>Захиалга амжилттай!</Text>
-            <Text style={styles.successSubtitle}>
-              Таны захиалгыг өгсөн хаяг руу илгээж байна.
-            </Text>
+            <View style={styles.successHero}>
+              <View style={styles.successHeroBlob1} />
+              <View style={styles.successHeroBlob2} />
+              <View style={styles.successIconCircle}>
+                <Ionicons name="checkmark" size={34} color="#FFFFFF" />
+              </View>
+              <Text style={styles.successKicker}>Амжилттай</Text>
+              <Text style={styles.successTitle}>Захиалга баталгаажлаа!</Text>
+              <Text style={styles.successSubtitle}>
+                Бид таны захиалгыг бэлтгээд, хүргэлтээр илгээнэ.
+              </Text>
+            </View>
             {order && (
               <View style={styles.posCard}>
                 <Text style={styles.posTitle}>Захиалгын дэлгэрэнгүй</Text>
@@ -589,7 +613,9 @@ export default function CheckoutConfirmScreen() {
           disabled={submitting}
         >
           <Text style={styles.confirmButtonText}>
-            {submitting ? "Түр хүлээнэ үү..." : "Захиалга баталгаажуулах"}
+            {submitting
+              ? "Түр хүлээнэ үү..."
+              : (user?.role === "admin" ? "Төлбөргүй баталгаажуулах" : "Захиалга баталгаажуулах")}
           </Text>
         </TouchableOpacity>
       </View>
@@ -603,7 +629,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#F5F5F7",
   },
   successScrollContent: {
-    paddingHorizontal: 32,
+    paddingHorizontal: 20,
     paddingTop: 72,
     paddingBottom: 40,
   },
@@ -612,28 +638,91 @@ const styles = StyleSheet.create({
     height: "100%",
     justifyContent: "center",
   },
-  successEmoji: { fontSize: 56, marginBottom: 16 },
+  successHero: {
+    width: "100%",
+    maxWidth: 380,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 22,
+    paddingVertical: 22,
+    paddingHorizontal: 18,
+    alignItems: "center",
+    marginBottom: 18,
+    borderWidth: 1,
+    borderColor: "#EFEFF0",
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
+    elevation: 3,
+  },
+  successHeroBlob1: {
+    position: "absolute",
+    width: 170,
+    height: 170,
+    borderRadius: 85,
+    backgroundColor: "rgba(140,26,122,0.12)",
+    top: -70,
+    right: -60,
+  },
+  successHeroBlob2: {
+    position: "absolute",
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: "rgba(46,125,50,0.12)",
+    bottom: -70,
+    left: -60,
+  },
+  successIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "#2E7D32",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+    shadowColor: "#2E7D32",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.22,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  successKicker: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#2E7D32",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+    marginBottom: 6,
+  },
   successTitle: {
     fontSize: 24,
-    fontWeight: "700",
+    fontWeight: "800",
     color: "#111111",
     marginBottom: 8,
+    textAlign: "center",
   },
   successSubtitle: {
     fontSize: 15,
     color: "#666666",
     textAlign: "center",
-    marginBottom: 24,
+    lineHeight: 20,
   },
   posCard: {
     width: "100%",
-    maxWidth: 340,
+    maxWidth: 380,
     backgroundColor: "#FFFFFF",
-    borderRadius: 14,
+    borderRadius: 18,
     padding: 16,
     marginBottom: 24,
     borderWidth: 1,
-    borderColor: "#E5E5E5",
+    borderColor: "#EFEFF0",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05,
+    shadowRadius: 14,
+    elevation: 2,
   },
   posTitle: {
     fontSize: 16,

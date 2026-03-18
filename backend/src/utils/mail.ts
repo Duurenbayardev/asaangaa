@@ -13,6 +13,9 @@ function getTransporter(): nodemailer.Transporter | null {
     port: port ?? 587,
     secure: port === 465,
     auth: { user, pass },
+    connectionTimeout: 15_000,
+    greetingTimeout: 15_000,
+    socketTimeout: 20_000,
   });
   return transporter;
 }
@@ -115,5 +118,16 @@ export async function sendAdminNewOrderEmail(to: string, data: AdminOrderEmailDa
     `<p><strong>Бараа:</strong></p>` +
     `<ul>${data.items.map((i) => `<li>${escapeHtml(i.name)} × ${i.qty}</li>`).join("")}</ul>`;
 
+  await sendEmail({ to, subject, text, html });
+}
+
+export async function sendPasswordResetCodeEmail(to: string, code: string): Promise<void> {
+  const subject = "Нууц үг сэргээх код - Asaangaa";
+  const text =
+    `Нууц үг сэргээх код: ${code}\n\n` +
+    `Энэ кодыг 15 минутын дотор ашиглана уу. Хэрэв та хүсээгүй бол энэ имэйлийг үл тооно уу.`;
+  const html =
+    `<p>Нууц үг сэргээх код: <strong>${escapeHtml(code)}</strong></p>` +
+    `<p>Энэ кодыг 15 минутын дотор ашиглана уу. Хэрэв та хүсээгүй бол энэ имэйлийг үл тооно уу.</p>`;
   await sendEmail({ to, subject, text, html });
 }

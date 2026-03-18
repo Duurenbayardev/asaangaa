@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
+import { router } from "expo-router";
 import {
   ActivityIndicator,
   Dimensions,
@@ -32,6 +33,40 @@ export function LoginContent({ onContinue, showHeader = false, onHeroImageLoad }
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = useCallback(async () => {
+    if (auth.isLoading) return;
+    setError(null);
+    if (!email.trim()) {
+      setError("И-мэйлээ оруулна уу.");
+      return;
+    }
+    if (!password) {
+      setError("Нууц үгээ оруулна уу.");
+      return;
+    }
+    if (isSignUp && password.length < 8) {
+      setError("Нууц үг 8 тэмдэгтээс дээш байх ёстой.");
+      return;
+    }
+    if (isSignUp && password !== passwordConfirm) {
+      setError("Нууц үг тохирохгүй байна.");
+      return;
+    }
+    try {
+      if (isSignUp) {
+        await auth.signUp(email.trim(), password, passwordConfirm, name.trim() || undefined);
+      } else {
+        await auth.login(email.trim(), password);
+      }
+      onContinue();
+    } catch (e: unknown) {
+      const msg = e && typeof e === "object" && "message" in e
+        ? String((e as { message: string }).message)
+        : "Холболт амжилтгүй. Дахин оролдоно уу.";
+      setError(msg);
+    }
+  }, [auth, email, isSignUp, name, onContinue, password, passwordConfirm]);
 
   return (
     <KeyboardAvoidingView
@@ -109,6 +144,7 @@ export function LoginContent({ onContinue, showHeader = false, onHeroImageLoad }
             editable
             underlineColorAndroid="transparent"
             selectionColor={THEME_PRIMARY}
+            returnKeyType="next"
           />
 
           <Text style={[styles.label, styles.labelSpacing]}>Нууц үг</Text>
@@ -122,6 +158,8 @@ export function LoginContent({ onContinue, showHeader = false, onHeroImageLoad }
             editable
             underlineColorAndroid="transparent"
             selectionColor={THEME_PRIMARY}
+            returnKeyType={isSignUp ? "next" : "done"}
+            onSubmitEditing={isSignUp ? undefined : handleSubmit}
           />
 
           {isSignUp && (
@@ -137,6 +175,8 @@ export function LoginContent({ onContinue, showHeader = false, onHeroImageLoad }
                 editable
                 underlineColorAndroid="transparent"
                 selectionColor={THEME_PRIMARY}
+                returnKeyType="done"
+                onSubmitEditing={handleSubmit}
               />
             </>
           )}
@@ -145,40 +185,19 @@ export function LoginContent({ onContinue, showHeader = false, onHeroImageLoad }
             <Text style={styles.errorText}>{error}</Text>
           ) : null}
 
+          {!isSignUp && (
+            <TouchableOpacity
+              style={styles.forgotLink}
+              onPress={() => router.push("/forgot-password")}
+              disabled={auth.isLoading}
+            >
+              <Text style={styles.forgotLinkText}>Нууц үг мартсан?</Text>
+            </TouchableOpacity>
+          )}
+
           <TouchableOpacity
             style={[styles.primaryButton, auth.isLoading && styles.primaryButtonDisabled]}
-            onPress={async () => {
-              setError(null);
-              if (!email.trim()) {
-                setError("И-мэйлээ оруулна уу.");
-                return;
-              }
-              if (!password) {
-                setError("Нууц үгээ оруулна уу.");
-                return;
-              }
-              if (isSignUp && password.length < 8) {
-                setError("Нууц үг 8 тэмдэгтээс дээш байх ёстой.");
-                return;
-              }
-              if (isSignUp && password !== passwordConfirm) {
-                setError("Нууц үг тохирохгүй байна.");
-                return;
-              }
-              try {
-                if (isSignUp) {
-                  await auth.signUp(email.trim(), password, passwordConfirm, name.trim() || undefined);
-                } else {
-                  await auth.login(email.trim(), password);
-                }
-                onContinue();
-              } catch (e: unknown) {
-                const msg = e && typeof e === "object" && "message" in e
-                  ? String((e as { message: string }).message)
-                  : "Холболт амжилтгүй. Дахин оролдоно уу.";
-                setError(msg);
-              }
-            }}
+            onPress={handleSubmit}
             disabled={auth.isLoading}
           >
             {auth.isLoading ? (
@@ -300,6 +319,15 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 14,
     color: "#C62828",
+  },
+  forgotLink: {
+    marginTop: 14,
+    alignItems: "center",
+  },
+  forgotLinkText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: THEME_PRIMARY,
   },
   primaryButtonText: {
     fontSize: 16,

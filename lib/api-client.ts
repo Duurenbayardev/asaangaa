@@ -11,24 +11,30 @@ type ExpoConstantsLike = {
   manifest2?: { extra?: Record<string, unknown> };
 };
 
+const DEFAULT_API_URL = "http://192.168.0.102:3000";
+
+/**
+ * Prefer manifest `extra` first. Metro inlines process.env.EXPO_PUBLIC_* at bundle time,
+ * so an old IP (e.g. .103) can stick forever until Constants.extra (fresh from dev server).
+ */
 function readBaseUrlFromEnv(): string {
-  try {
-    const fromProcess = typeof process !== "undefined" && process.env?.EXPO_PUBLIC_API_URL;
-    if (fromProcess && typeof process.env.EXPO_PUBLIC_API_URL === "string") {
-      return process.env.EXPO_PUBLIC_API_URL.replace(/\/$/, "");
-    }
-  } catch (_) {}
   try {
     const expoConstants = require("expo-constants");
     const Constants = (expoConstants.default ?? expoConstants) as ExpoConstantsLike;
     const fromExtra =
       (Constants.expoConfig?.extra?.EXPO_PUBLIC_API_URL as string | undefined) ??
       (Constants.manifest2?.extra?.EXPO_PUBLIC_API_URL as string | undefined);
-    if (fromExtra && typeof fromExtra === "string") {
+    if (fromExtra && typeof fromExtra === "string" && fromExtra.trim()) {
       return fromExtra.replace(/\/$/, "");
     }
   } catch (_) {}
-  return "http://localhost:3000";
+  try {
+    const fromProcess = typeof process !== "undefined" && process.env?.EXPO_PUBLIC_API_URL;
+    if (fromProcess && typeof process.env.EXPO_PUBLIC_API_URL === "string") {
+      return process.env.EXPO_PUBLIC_API_URL.replace(/\/$/, "");
+    }
+  } catch (_) {}
+  return DEFAULT_API_URL;
 }
 
 // Resolved on first use so env/constants are ready when images resolve (fixes wrong base URL)

@@ -24,6 +24,7 @@ model User {
   wishlistItems WishlistItem[]
   orders       Order[]
   otpCodes     OtpCode[]
+  passwordResetCodes PasswordResetCode[]
 }
 
 model OtpCode {
@@ -37,6 +38,20 @@ model OtpCode {
   @@index([userId])
   @@index([expiresAt])
   @@map("otp_codes")
+}
+
+model PasswordResetCode {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  code      String
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  usedAt    DateTime? @map("used_at")
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_codes")
 }
 
 model Category {

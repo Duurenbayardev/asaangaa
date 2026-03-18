@@ -55,7 +55,7 @@ export default function CategoriesScreen() {
         {results.map((cat) => (
           <Pressable
             key={cat.id}
-            style={[styles.tile, { backgroundColor: cat.bg }]}
+            style={styles.tile}
             onPress={() =>
               router.push({
                 pathname: "/categories/[category]",
@@ -63,7 +63,7 @@ export default function CategoriesScreen() {
               })
             }
           >
-            <Ionicons name={cat.icon} size={36} color="#37474F" />
+            <Ionicons name={cat.icon} size={36} color={cat.iconColor} />
             <View style={{ flex: 1 }}>
             <Text style={styles.tileLabel}>{cat.label}</Text>
             <Text style={styles.tileMeta}>
@@ -112,6 +112,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 16,
     marginBottom: 16,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#EFEFF0",
   },
   tileLabel: {
     fontSize: 22,
