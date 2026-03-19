@@ -11,8 +11,8 @@ import {
   Text,
   View,
 } from "react-native";
-import { useAuth } from "../context/AuthContext";
 import { LoginContent } from "../components/LoginContent";
+import { useAuth } from "../context/AuthContext";
 
 const THEME_PRIMARY = "#8C1A7A";
 const THEME_BACKGROUND = "#FFFFFF";

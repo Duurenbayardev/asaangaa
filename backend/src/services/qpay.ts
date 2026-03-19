@@ -79,6 +79,7 @@ export interface QPayInvoiceUrl {
   name: string;
   description?: string;
   link: string;
+  logo?: string;
 }
 
 export interface CreateInvoiceResponse {

@@ -1,8 +1,8 @@
 import { Stack, router } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import { View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { StatusBar } from "expo-status-bar";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { AuthProvider, useAuth } from "../context/AuthContext";
 import { GroceryProvider } from "../context/GroceryContext";
@@ -51,11 +51,15 @@ export default function RootLayout() {
             screenOptions={{
               headerShown: false,
               animation: "slide_from_right",
-              fullScreenGestureEnabled: true,
+              // Prevent iOS swipe-back from taking users to a blank/invalid screen after login.
+              // We selectively control gestures per-screen below.
+              fullScreenGestureEnabled: false,
               animationDuration: 200,
               contentStyle: { flex: 1, backgroundColor: "#FFFFFF" },
             }}
-          />
+          >
+            <Stack.Screen name="(tabs)" options={{ gestureEnabled: false }} />
+          </Stack>
           {showInitialLoading && (
             <LoadingScreen progress={initialProgress} />
           )}

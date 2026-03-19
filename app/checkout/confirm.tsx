@@ -3,28 +3,29 @@ import Constants from "expo-constants";
 import { router } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-    Alert,
-    Image,
-    Linking,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  Animated,
+  Image,
+  Linking,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { BackButton } from "../../components/BackButton";
 import { useAuth } from "../../context/AuthContext";
 import { useGrocery } from "../../context/GroceryContext";
 import { formatTugrug } from "../../lib/formatCurrency";
 import {
-    checkOrderPayment,
-    createOrder,
-    createOrderWithQPay,
-    getOrder,
-    type CreateOrderResponse,
-    type CreateOrderWithQPayResponse,
+  checkOrderPayment,
+  createOrder,
+  createOrderWithQPay,
+  getOrder,
+  type CreateOrderResponse,
+  type CreateOrderWithQPayResponse,
 } from "../../lib/orders-api";
 
 const THEME_PRIMARY = "#8C1A7A";
@@ -148,16 +149,47 @@ function getBankBadge(name: string): { abbr: string; color: string } {
 const LOGO_DEV_SIZE = 112;
 const LOGO_DEV_BASE = "https://img.logo.dev";
 
-function BankBadge({ name }: { name: string }) {
+// Local bank/app icons (preferred for QPay screen)
+const BANK_ICON_ASSETS: Record<string, number> = {
+  "khanbank.com": require("../../assets/images/bank icons/khanbank.jpg"),
+  "statebank.mn": require("../../assets/images/bank icons/statebank.png"),
+  "xacbank.mn": require("../../assets/images/bank icons/Khasbank.png"),
+  "tdbm.mn": require("../../assets/images/bank icons/tdb.png"),
+  "most.mn": require("../../assets/images/bank icons/mostmoney.jpg"),
+  "nibank.mn": require("../../assets/images/bank icons/nibank.jpg"),
+  "ckb.mn": require("../../assets/images/bank icons/ckbank.png"),
+  "capitron.mn": require("../../assets/images/bank icons/capitron.jpg"),
+  "bogdbank.mn": require("../../assets/images/bank icons/bogdbank.jpg"),
+  "monpay.mn": require("../../assets/images/bank icons/Monpay.jpg"),
+};
+
+function BankBadge({ name, logoUrl }: { name: string; logoUrl?: string }) {
   const [logoError, setLogoError] = useState(false);
   const domain = getBankDomain(name);
+  const localIcon = domain ? BANK_ICON_ASSETS[domain] : undefined;
   const token = getLogoDevPublishableKey();
-  const showLogo = Boolean(domain && token && !logoError);
+  const showLogo = Boolean(!localIcon && domain && token && !logoError);
   const { abbr, color } = getBankBadge(name);
 
   useEffect(() => {
     setLogoError(false);
-  }, [name]);
+  }, [name, logoUrl]);
+
+  if (localIcon) {
+    return (
+      <View style={[styles.bankBadge, styles.bankBadgeLogoWrap]}>
+        <Image source={localIcon} style={styles.bankBadgeLogo} />
+      </View>
+    );
+  }
+
+  if (logoUrl && !logoError) {
+    return (
+      <View style={[styles.bankBadge, styles.bankBadgeLogoWrap]}>
+        <Image source={{ uri: logoUrl }} style={styles.bankBadgeLogo} onError={() => setLogoError(true)} />
+      </View>
+    );
+  }
 
   if (showLogo && domain && token) {
     const logoUri = `${LOGO_DEV_BASE}/${domain}?token=${encodeURIComponent(token)}&size=${LOGO_DEV_SIZE}&format=png&fallback=404`;
@@ -197,8 +229,28 @@ export default function CheckoutConfirmScreen() {
   const [checkingPayment, setCheckingPayment] = useState(false);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Success animation: dramatic entrance only (no looping)
+  const successEnter = useRef(new Animated.Value(0)).current; // 0..1
+
   const verifiedPhone = user?.phone?.trim() ?? "";
   const hasPhone = useVerifiedPhone ? !!verifiedPhone : phone.trim().length >= 1;
+
+  useEffect(() => {
+    if (!showOrderSuccess) return;
+    successEnter.setValue(0);
+
+    // A slightly staged entrance feels more "premium" than a single spring.
+    Animated.sequence([
+      Animated.delay(120),
+      Animated.spring(successEnter, {
+        toValue: 1,
+        stiffness: 240,
+        damping: 16,
+        mass: 0.9,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [showOrderSuccess, successEnter]);
 
   const { subtotal, tax, delivery, grandTotal, lines } = useMemo(() => {
     if (!checkoutItems || checkoutItems.length === 0) {
@@ -405,7 +457,7 @@ export default function CheckoutConfirmScreen() {
             <Text style={styles.banksCardTitle}>Банк / апп сонгох</Text>
             <View style={styles.bankGrid}>
               {paymentState.qPay.urls?.map((u, i) => {
-                const label = u.name || u.description || "Төлөх";
+                const label = u.description || u.name || "Төлөх";
                 const displayName = getBankMongolianName(label);
                 return (
                   <TouchableOpacity
@@ -414,7 +466,7 @@ export default function CheckoutConfirmScreen() {
                     onPress={() => u.link && Linking.openURL(u.link)}
                     activeOpacity={0.7}
                   >
-                    <BankBadge name={label} />
+                    <BankBadge name={label} logoUrl={(u as { logo?: string }).logo} />
                     <Text style={styles.bankGridLabel} numberOfLines={2}>
                       {displayName}
                     </Text>
@@ -435,59 +487,39 @@ export default function CheckoutConfirmScreen() {
     const createdDate = order?.createdAt
       ? new Date(order.createdAt).toLocaleString("mn-MN", { dateStyle: "medium", timeStyle: "short" })
       : "";
+    const enterOpacity = successEnter.interpolate({ inputRange: [0, 0.25, 1], outputRange: [0, 1, 1] });
+    const enterY = successEnter.interpolate({ inputRange: [0, 1], outputRange: [16, 0] });
+    const enterScale = successEnter.interpolate({ inputRange: [0, 1], outputRange: [0.72, 1] });
     return (
-      <View style={styles.container}>
+      <View style={styles.successMinimalPage}>
         <BackButton />
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.successScrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.successCenter}>
-            <View style={styles.successHero}>
-              <View style={styles.successHeroBlob1} />
-              <View style={styles.successHeroBlob2} />
-              <View style={styles.successIconCircle}>
-                <Ionicons name="checkmark" size={34} color="#FFFFFF" />
-              </View>
-              <Text style={styles.successKicker}>Амжилттай</Text>
-              <Text style={styles.successTitle}>Захиалга баталгаажлаа!</Text>
-              <Text style={styles.successSubtitle}>
-                Бид таны захиалгыг бэлтгээд, хүргэлтээр илгээнэ.
-              </Text>
+        <View style={styles.successMinimalCenter}>
+          <Animated.View
+            style={{
+              opacity: enterOpacity,
+              transform: [{ translateY: enterY }, { scale: enterScale }],
+              alignItems: "center",
+            }}
+          >
+            <View style={styles.successMinimalCheckRing}>
+              <Ionicons name="checkmark" size={54} color="#16A34A" />
             </View>
-            {order && (
-              <View style={styles.posCard}>
-                <Text style={styles.posTitle}>Захиалгын дэлгэрэнгүй</Text>
-                <View style={styles.posRow}>
-                  <Text style={styles.posLabel}>Захиалгын дугаар</Text>
-                  <Text style={styles.posValue}>#{order.id.slice(-8).toUpperCase()}</Text>
-                </View>
-                <View style={styles.posRow}>
-                  <Text style={styles.posLabel}>Огноо</Text>
-                  <Text style={styles.posValue}>{createdDate}</Text>
-                </View>
-                <View style={styles.posDivider} />
-                {order.lines?.map((line, i) => (
-                  <View key={i} style={styles.posLineRow}>
-                    <Text style={styles.posLineText} numberOfLines={1}>
-                      {line.quantity} × {line.productName}
-                    </Text>
-                    <Text style={styles.posLineTotal}>{formatTugrug(Number(line.total))}</Text>
-                  </View>
-                ))}
-                <View style={styles.posDivider} />
-                <View style={styles.posRow}>
-                  <Text style={styles.posTotalLabel}>Нийт дүн</Text>
-                  <Text style={styles.posTotalValue}>{formatTugrug(order.grandTotal)}</Text>
-                </View>
-              </View>
-            )}
-            <TouchableOpacity style={styles.successButton} onPress={handleSuccessDismiss}>
-              <Text style={styles.successButtonText}>Үргэлжлүүлэх</Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
+            <Text style={styles.successMinimalTitle}>Захиалга амжилттай!</Text>
+            <Text style={styles.successMinimalSubtitle}>Таны захиалга баталгаажлаа.</Text>
+
+            {order ? (
+              <>
+                <Text style={styles.successMinimalInfo}>Захиалгын дугаар: #{order.id.slice(-8).toUpperCase()}</Text>
+                {createdDate ? <Text style={styles.successMinimalInfo}>Огноо: {createdDate}</Text> : null}
+                <Text style={styles.successMinimalInfo}>Нийт дүн: {formatTugrug(order.grandTotal)}</Text>
+              </>
+            ) : null}
+
+            <Pressable style={styles.successMinimalContinue} onPress={handleSuccessDismiss}>
+              <Text style={styles.successMinimalContinueText}>Үргэлжлүүлэх</Text>
+            </Pressable>
+          </Animated.View>
+        </View>
       </View>
     );
   }
@@ -627,6 +659,59 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F5F5F7",
+  },
+  // Minimal, premium success screen
+  successMinimalPage: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+  },
+  successMinimalCenter: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 22,
+    paddingBottom: 22,
+  },
+  successMinimalCheckRing: {
+    width: 104,
+    height: 104,
+    borderRadius: 52,
+    borderWidth: 3,
+    borderColor: "#16A34A",
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 18,
+  },
+  successMinimalTitle: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#0B1220",
+    letterSpacing: 0.2,
+    textAlign: "center",
+  },
+  successMinimalSubtitle: {
+    marginTop: 8,
+    fontSize: 14,
+    color: "#475569",
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  successMinimalInfo: {
+    marginTop: 10,
+    fontSize: 14,
+    color: "#111827",
+    textAlign: "center",
+  },
+  successMinimalContinue: {
+    marginTop: 18,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+  },
+  successMinimalContinueText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: THEME_PRIMARY,
   },
   successScrollContent: {
     paddingHorizontal: 20,

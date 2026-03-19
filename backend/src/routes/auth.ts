@@ -83,14 +83,8 @@ router.post(
       }
       const passwordHash = await hashPassword(password);
       const user = await prisma.user.create({
-        data: { email, passwordHash, name: name || null },
+        data: { email, passwordHash, name: name || null, emailVerified: true },
       });
-      const code = generateVerificationCode();
-      const expiresAt = new Date(Date.now() + EMAIL_VERIFICATION_CODE_EXPIRY_MINUTES * 60 * 1000);
-      await prisma.otpCode.create({
-        data: { userId: user.id, code, expiresAt },
-      });
-      await sendVerificationCodeEmail(user.email, code);
       const accessToken = signToken({ userId: user.id, email: user.email });
       res.status(201).json({
         accessToken,

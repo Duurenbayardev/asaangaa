@@ -52,10 +52,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const setToken = useCallback((t: string | null) => {
-    setTokenState(t);
-    if (!t) setUser(null);
-  }, []);
+  const setToken = useCallback(
+    (t: string | null) => {
+      setTokenState(t);
+      if (!t) {
+        setUser(null);
+        // Ensure stale sessions don't come back after app restart.
+        void clearStoredAuth();
+      }
+    },
+    [clearStoredAuth]
+  );
 
   const persistAuth = useCallback(async (accessToken: string, userData: User) => {
     await Promise.all([
@@ -127,10 +134,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [token]);
 
   const logout = useCallback(() => {
-    clearStoredAuth();
-    setTokenState(null);
-    setUser(null);
-  }, [clearStoredAuth]);
+    // Use the same path as forced-logout/401 so storage is always cleared.
+    setToken(null);
+  }, [setToken]);
 
   const getAuthHeaders = useCallback(() => {
     return token ? authApi.getAuthHeaders(token) : {};

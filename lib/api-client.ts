@@ -182,6 +182,9 @@ export async function apiRequest<T>(
       "Content-Type": "application/json",
       ...(init.headers as Record<string, string>),
     };
+    const hasAuthHeader =
+      typeof (headers as Record<string, unknown>)?.Authorization === "string" ||
+      typeof (headers as Record<string, unknown>)?.authorization === "string";
 
     let attempt = 0;
 
@@ -222,7 +225,9 @@ export async function apiRequest<T>(
         continue;
       }
 
-      if (res.status === 401) {
+      // Only trigger global unauthorized flow for authenticated requests.
+      // Otherwise, a failed /auth/login would "log out" and bounce routes.
+      if (res.status === 401 && hasAuthHeader) {
         try {
           const { triggerUnauthorized } = require("./auth-callback");
           triggerUnauthorized();

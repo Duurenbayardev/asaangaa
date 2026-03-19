@@ -13,11 +13,13 @@ import {
   View,
 } from "react-native";
 import { BackButton } from "../components/BackButton";
+import { useAuth } from "../context/AuthContext";
 import * as authApi from "../lib/auth-api";
 
 const THEME_PRIMARY = "#8C1A7A";
 
 export default function ForgotPasswordScreen() {
+  const auth = useAuth();
   const [step, setStep] = useState<"request" | "reset">("request");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -66,8 +68,13 @@ export default function ForgotPasswordScreen() {
     setInfo(null);
     try {
       await authApi.resetPassword(email.trim(), code.trim(), newPassword);
-      setInfo("Нууц үг амжилттай шинэчлэгдлээ. Нэвтэрч орно уу.");
-      setTimeout(() => router.replace("/login"), 700);
+      try {
+        await auth.login(email.trim(), newPassword);
+        router.replace("/(tabs)/home");
+      } catch {
+        setInfo("Нууц үг шинэчлэгдлээ. Сүлжээний алдаа — нэвтрэх хуудаснаас дахин оролдоно уу.");
+        router.replace("/login");
+      }
     } catch (e: unknown) {
       const msg = e && typeof e === "object" && "message" in e ? String((e as { message: string }).message) : "Алдаа гарлаа.";
       setError(msg);
