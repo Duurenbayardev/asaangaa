@@ -1,9 +1,9 @@
-# fly.toml app configuration file generated for backend-delicate-frost-5906 on 2026-03-26T17:22:21+08:00
+# fly.toml app configuration file generated for backend-wispy-wave-877 on 2026-03-26T17:37:58+08:00
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = 'backend-delicate-frost-5906'
+app = 'backend-wispy-wave-877'
 primary_region = 'sin'
 
 [build]
@@ -13,7 +13,7 @@ primary_region = 'sin'
   seed_command = 'ts-node prisma/seed.ts'
 
 [http_service]
-  internal_port = 3000
+  internal_port = 8080
   force_https = true
   auto_stop_machines = 'stop'
   auto_start_machines = true
