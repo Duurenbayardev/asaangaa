@@ -101,6 +101,16 @@ router.get("/me", auth, requireUser, (req, res) => {
   res.json(toUser(req.user!));
 });
 
+// In-app account deletion endpoint (required by app stores for account-based apps).
+router.delete("/me", auth, requireUser, async (req, res, next) => {
+  try {
+    await prisma.user.delete({ where: { id: req.userId! } });
+    res.json({ message: "Account deleted" });
+  } catch (e) {
+    next(e);
+  }
+});
+
 router.post(
   "/send-verification-email",
   auth,

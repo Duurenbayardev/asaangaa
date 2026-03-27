@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
+    Alert,
     ActivityIndicator,
     Image,
     ScrollView,
@@ -89,7 +90,16 @@ function RowAction({
 }
 
 export default function ProfileScreen() {
-  const { user, token, isRestored, sendVerificationEmail, verifyEmail, logout: authLogout, isLoading: authLoading } = useAuth();
+  const {
+    user,
+    token,
+    isRestored,
+    sendVerificationEmail,
+    verifyEmail,
+    deleteAccount,
+    logout: authLogout,
+    isLoading: authLoading,
+  } = useAuth();
   const [verificationCodeSent, setVerificationCodeSent] = useState(false);
   const [verificationCode, setVerificationCode] = useState("");
   const [verificationError, setVerificationError] = useState<string | null>(null);
@@ -104,6 +114,32 @@ export default function ProfileScreen() {
     setShowLogoutConfirm(false);
     authLogout();
     router.replace("/?login=1");
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      "Бүртгэл устгах",
+      "Та бүртгэлээ бүр мөсөн устгах уу? Энэ үйлдлийг буцаах боломжгүй.",
+      [
+        { text: "Цуцлах", style: "cancel" },
+        {
+          text: "Устгах",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteAccount();
+              router.replace("/?login=1");
+            } catch (e: unknown) {
+              const msg =
+                e && typeof e === "object" && "message" in e
+                  ? String((e as { message: string }).message)
+                  : "Бүртгэл устгахад алдаа гарлаа.";
+              Alert.alert("Алдаа", msg);
+            }
+          },
+        },
+      ]
+    );
   };
 
   if (isRestored && !token) {
@@ -383,6 +419,11 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         )}
 
+        <TouchableOpacity style={styles.deleteAccountButton} onPress={handleDeleteAccount}>
+          <Ionicons name="trash-outline" size={18} color="#B00020" />
+          <Text style={styles.deleteAccountText}>Бүртгэл устгах</Text>
+        </TouchableOpacity>
+
         <View style={{ height: 48 }} />
       </ScrollView>
     </View>
@@ -608,6 +649,23 @@ const styles = StyleSheet.create({
   },
   logoutText: {
     fontSize: 15,
+    fontWeight: "600",
+    color: "#B00020",
+  },
+  deleteAccountButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: 10,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#F4D4DA",
+    backgroundColor: "#FFF7F8",
+  },
+  deleteAccountText: {
+    fontSize: 14,
     fontWeight: "600",
     color: "#B00020",
   },

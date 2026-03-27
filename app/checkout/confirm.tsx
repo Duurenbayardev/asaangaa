@@ -601,7 +601,6 @@ export default function CheckoutConfirmScreen() {
             <Ionicons name="call-outline" size={18} color={THEME_PRIMARY} />
             <Text style={styles.phoneHeaderTitle}>Хүргэлтийн холбоо барих дугаар</Text>
           </View>
-          <Text style={styles.phoneHelperText}>Монгол дугаар 8 оронтой байх ёстой.</Text>
           {verifiedPhone ? (
             <>
               {useVerifiedPhone ? (

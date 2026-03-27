@@ -15,6 +15,7 @@ type AuthContextValue = {
   signUp: (email: string, password: string, passwordConfirm: string, name?: string) => Promise<void>;
   sendVerificationEmail: () => Promise<void>;
   verifyEmail: (code: string) => Promise<void>;
+  deleteAccount: () => Promise<void>;
   logout: () => void;
   setToken: (t: string | null) => void;
   setUser: (u: User | null) => void;
@@ -52,6 +53,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  const clearStoredAuth = useCallback(async () => {
+    try {
+      await Promise.all([
+        AsyncStorage.removeItem(AUTH_TOKEN_KEY),
+        AsyncStorage.removeItem(AUTH_USER_KEY),
+      ]);
+    } catch {
+      // ignore
+    }
+  }, []);
+
   const setToken = useCallback(
     (t: string | null) => {
       setTokenState(t);
@@ -69,17 +81,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       AsyncStorage.setItem(AUTH_TOKEN_KEY, accessToken),
       AsyncStorage.setItem(AUTH_USER_KEY, JSON.stringify(userData)),
     ]);
-  }, []);
-
-  const clearStoredAuth = useCallback(async () => {
-    try {
-      await Promise.all([
-        AsyncStorage.removeItem(AUTH_TOKEN_KEY),
-        AsyncStorage.removeItem(AUTH_USER_KEY),
-      ]);
-    } catch {
-      // ignore
-    }
   }, []);
 
   const login = useCallback(
@@ -133,6 +134,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [token]);
 
+  const deleteAccount = useCallback(async () => {
+    if (!token) return;
+    setIsLoading(true);
+    try {
+      await authApi.deleteMyAccount(token);
+      setTokenState(null);
+      setUser(null);
+      await clearStoredAuth();
+    } finally {
+      setIsLoading(false);
+    }
+  }, [token, clearStoredAuth]);
+
   const logout = useCallback(() => {
     // Use the same path as forced-logout/401 so storage is always cleared.
     setToken(null);
@@ -152,12 +166,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signUp,
       sendVerificationEmail,
       verifyEmail,
+      deleteAccount,
       logout,
       setToken,
       setUser,
       getAuthHeaders,
     }),
-    [token, user, isLoading, isRestored, login, signUp, sendVerificationEmail, verifyEmail, logout, setToken, setUser, getAuthHeaders]
+    [token, user, isLoading, isRestored, login, signUp, sendVerificationEmail, verifyEmail, deleteAccount, logout, setToken, setUser, getAuthHeaders]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

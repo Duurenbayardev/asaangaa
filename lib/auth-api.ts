@@ -37,6 +37,13 @@ export async function getMe(token: string): Promise<User> {
   });
 }
 
+export async function deleteMyAccount(token: string): Promise<void> {
+  await apiRequest<{ message: string }>("/auth/me", {
+    method: "DELETE",
+    headers: getAuthHeaders(token),
+  });
+}
+
 export async function forgotPassword(email: string): Promise<void> {
   await apiRequest<{ message: string }>("/auth/forgot-password", {
     method: "POST",

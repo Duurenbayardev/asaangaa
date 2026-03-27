@@ -17,6 +17,7 @@ import uploadRoutes from "./routes/upload";
 import imageRoutes from "./routes/images";
 import ocrRoutes from "./routes/ocr";
 import adminRoutes from "./routes/admin";
+import legalRoutes from "./routes/legal";
 
 const app = express();
 
@@ -70,6 +71,7 @@ app.use("/upload", uploadRoutes);
 app.use("/images", imageRoutes);
 app.use("/ocr", ocrRoutes);
 app.use("/admin", adminRoutes);
+app.use("/legal", legalRoutes);
 
 app.use(errorHandler);
 
