@@ -23,6 +23,8 @@ router.put(
     body("deliveryFreeThreshold").optional().isFloat({ min: 0 }),
     body("taxEnabled").optional().isBoolean(),
     body("taxRate").optional().isFloat({ min: 0, max: 1 }),
+    body("supportPhone").optional().isString().trim().isLength({ min: 3, max: 40 }),
+    body("supportEmail").optional().isEmail().normalizeEmail(),
   ]),
   async (req, res, next) => {
     try {

@@ -18,6 +18,7 @@ import imageRoutes from "./routes/images";
 import ocrRoutes from "./routes/ocr";
 import adminRoutes from "./routes/admin";
 import legalRoutes from "./routes/legal";
+import settingsRoutes from "./routes/settings";
 
 const app = express();
 
@@ -72,6 +73,7 @@ app.use("/images", imageRoutes);
 app.use("/ocr", ocrRoutes);
 app.use("/admin", adminRoutes);
 app.use("/legal", legalRoutes);
+app.use("/settings", settingsRoutes);
 
 app.use(errorHandler);
 

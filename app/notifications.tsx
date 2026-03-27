@@ -1,11 +1,31 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { useEffect, useState } from "react";
 import { Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { BackButton } from "../components/BackButton";
+import { getApiBaseUrl, parseJsonResponse } from "../lib/api-client";
 
 export default function NotificationsScreen() {
-  const phone = "+97699119911";
-  const email = "support@asaangaa.mn";
+  const [phone, setPhone] = useState("+97699119911");
+  const [email, setEmail] = useState("support@asaangaa.mn");
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await fetch(`${getApiBaseUrl()}/settings/contact`);
+        const data = (await parseJsonResponse(res)) as { supportPhone?: string; supportEmail?: string };
+        if (!res.ok || !mounted) return;
+        if (data.supportPhone) setPhone(data.supportPhone);
+        if (data.supportEmail) setEmail(data.supportEmail);
+      } catch {
+        // fallback to defaults
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const openPhone = async () => {
     const url = `tel:${phone}`;

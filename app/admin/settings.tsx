@@ -22,6 +22,8 @@ export default function AdminSettingsScreen() {
   const [deliveryFreeThreshold, setDeliveryFreeThreshold] = useState("");
   const [taxRate, setTaxRate] = useState("");
   const [taxEnabled, setTaxEnabled] = useState(true);
+  const [supportPhone, setSupportPhone] = useState("");
+  const [supportEmail, setSupportEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
 
@@ -38,6 +40,8 @@ export default function AdminSettingsScreen() {
         setDeliveryFreeThreshold(String(s.deliveryFreeThreshold));
         setTaxRate(String(Math.round(s.taxRate * 100)));
         setTaxEnabled(Boolean(s.taxEnabled));
+        setSupportPhone(s.supportPhone ?? "");
+        setSupportEmail(s.supportEmail ?? "");
       } catch (e: unknown) {
         if (!mounted) return;
         const msg = e && typeof e === "object" && "message" in e ? String((e as { message: string }).message) : "Тохиргоо уншихад алдаа гарлаа.";
@@ -69,6 +73,8 @@ export default function AdminSettingsScreen() {
       deliveryFreeThreshold: Number(deliveryFreeThreshold || 0),
       taxEnabled,
       taxRate: Number(taxRate || 0) / 100,
+      supportPhone: supportPhone.trim(),
+      supportEmail: supportEmail.trim(),
     };
     if (!Number.isFinite(payload.deliveryFee) || payload.deliveryFee < 0) {
       setError("Хүргэлтийн үнэ зөв биш байна.");
@@ -85,12 +91,24 @@ export default function AdminSettingsScreen() {
       setSaving(false);
       return;
     }
+    if (payload.supportPhone.length < 3) {
+      setError("Холбоо барих утас дутуу байна.");
+      setSaving(false);
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.supportEmail)) {
+      setError("И-мэйл хаяг буруу байна.");
+      setSaving(false);
+      return;
+    }
     try {
       const s = await updateAdminSettings(token, payload);
       setDeliveryFee(String(s.deliveryFee));
       setDeliveryFreeThreshold(String(s.deliveryFreeThreshold));
       setTaxRate(String(Math.round(s.taxRate * 100)));
       setTaxEnabled(Boolean(s.taxEnabled));
+      setSupportPhone(s.supportPhone ?? "");
+      setSupportEmail(s.supportEmail ?? "");
       setOk("Тохиргоо хадгалагдлаа.");
     } catch (e: unknown) {
       const msg = e && typeof e === "object" && "message" in e ? String((e as { message: string }).message) : "Хадгалахад алдаа гарлаа.";
@@ -141,6 +159,27 @@ export default function AdminSettingsScreen() {
               onChangeText={setTaxRate}
               keyboardType="decimal-pad"
               placeholder="10"
+              placeholderTextColor="#999"
+            />
+
+            <Text style={[styles.label, styles.space]}>Тусламж утас</Text>
+            <TextInput
+              style={styles.input}
+              value={supportPhone}
+              onChangeText={setSupportPhone}
+              keyboardType="phone-pad"
+              placeholder="+97699119911"
+              placeholderTextColor="#999"
+            />
+
+            <Text style={[styles.label, styles.space]}>Тусламж имэйл</Text>
+            <TextInput
+              style={styles.input}
+              value={supportEmail}
+              onChangeText={setSupportEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              placeholder="support@asaangaa.mn"
               placeholderTextColor="#999"
             />
           </View>

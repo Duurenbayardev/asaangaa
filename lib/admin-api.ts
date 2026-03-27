@@ -7,6 +7,8 @@ export type AdminAppSettings = {
   deliveryFreeThreshold: number;
   taxEnabled: boolean;
   taxRate: number;
+  supportPhone: string;
+  supportEmail: string;
 };
 
 export async function getAdminProducts(token: string): Promise<Product[]> {

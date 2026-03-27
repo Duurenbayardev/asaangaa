@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { getAppSettings } from "../utils/appSettings";
 
 const router = Router();
 
@@ -82,20 +83,25 @@ router.get("/terms", (_req, res) => {
   );
 });
 
-router.get("/support", (_req, res) => {
-  res.type("html").send(
-    page(
-      "Asaangaa Support",
-      `
-      <h1>Support</h1>
-      <p>If you need help with orders, payments, or your account, contact us:</p>
-      <ul>
-        <li>Phone: +97699119911</li>
-        <li>Email: support@asaangaa.mn</li>
-      </ul>
-      `
-    )
-  );
+router.get("/support", async (_req, res, next) => {
+  try {
+    const settings = await getAppSettings();
+    res.type("html").send(
+      page(
+        "Asaangaa Support",
+        `
+        <h1>Support</h1>
+        <p>If you need help with orders, payments, or your account, contact us:</p>
+        <ul>
+          <li>Phone: ${settings.supportPhone}</li>
+          <li>Email: ${settings.supportEmail}</li>
+        </ul>
+        `
+      )
+    );
+  } catch (e) {
+    next(e);
+  }
 });
 
 export default router;
