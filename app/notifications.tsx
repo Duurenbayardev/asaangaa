@@ -1,9 +1,26 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { BackButton } from "../components/BackButton";
 
 export default function NotificationsScreen() {
+  const phone = "+97699119911";
+  const email = "support@asaangaa.mn";
+
+  const openPhone = async () => {
+    const url = `tel:${phone}`;
+    if (await Linking.canOpenURL(url)) {
+      await Linking.openURL(url);
+    }
+  };
+
+  const openMail = async () => {
+    const url = `mailto:${email}`;
+    if (await Linking.canOpenURL(url)) {
+      await Linking.openURL(url);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <BackButton fallbackHref="/(tabs)/home" />
@@ -13,12 +30,20 @@ export default function NotificationsScreen() {
       >
         <View style={styles.emptyWrap}>
           <View style={styles.iconWrap}>
-            <Ionicons name="notifications-off-outline" size={56} color="#C0C0C0" />
+            <Ionicons name="help-circle-outline" size={56} color="#8C1A7A" />
           </View>
-          <Text style={styles.emptyTitle}>Мэдэгдэл байхгүй</Text>
+          <Text style={styles.emptyTitle}>Тусламж & Холбоо барих</Text>
           <Text style={styles.emptyText}>
-            Шинэ захиалга, хөнгөлөлт болон бусад мэдэгдэл энд гарна.
+            Асуудал гарвал доорх утас болон имэйлээр холбогдоно уу.
           </Text>
+          <TouchableOpacity style={styles.contactBtn} onPress={openPhone}>
+            <Ionicons name="call-outline" size={18} color="#FFFFFF" />
+            <Text style={styles.contactBtnText}>{phone}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.contactBtn, styles.contactBtnSecondary]} onPress={openMail}>
+            <Ionicons name="mail-outline" size={18} color="#8C1A7A" />
+            <Text style={styles.contactBtnTextSecondary}>{email}</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </View>
@@ -51,5 +76,31 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#777777",
     textAlign: "center",
+  },
+  contactBtn: {
+    marginTop: 14,
+    borderRadius: 12,
+    backgroundColor: "#8C1A7A",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
+  contactBtnSecondary: {
+    backgroundColor: "#F7EEF5",
+    borderWidth: 1,
+    borderColor: "#E9D2E3",
+  },
+  contactBtnText: {
+    color: "#FFF",
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  contactBtnTextSecondary: {
+    color: "#8C1A7A",
+    fontSize: 15,
+    fontWeight: "600",
   },
 });

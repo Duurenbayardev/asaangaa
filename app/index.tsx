@@ -4,8 +4,6 @@ import {
   Animated,
   Dimensions,
   Image,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
   ScrollView,
   StyleSheet,
   Text,
@@ -17,6 +15,7 @@ import { useAuth } from "../context/AuthContext";
 const THEME_PRIMARY = "#8C1A7A";
 const THEME_BACKGROUND = "#FFFFFF";
 const { width, height: SCREEN_HEIGHT } = Dimensions.get("window");
+const INITIAL_LOADING_OVERLAY_MS = 2000; // keep in sync with app/_layout.tsx loader timing
 
 const SLIDES = [
   {
@@ -24,21 +23,7 @@ const SLIDES = [
     eyebrow: "Гэрийн тань үүдэнд",
     title: "Эх орны хөрсөнд ургасан ургац",
     description:
-      "Өдөр бүр шинэ, эрүүл ахуй, чанарын стандарт хангасан аюулгүй орчинд тариалсан.",
-  },
-  {
-    id: "plan",
-    eyebrow: "Өдөр бүр шинэ.",
-    title: "БҮРЭН АВТОMAT ДӨРВӨН УЛИРЛЫН ШИЛЭН ХҮЛЭМЖ.",
-    description:
-      "",
-  },
-  {
-    id: "Түргэн Хүргэлт ",
-    eyebrow: "Түргэн Хүргэлт",
-    title: "Хүлэмжнээс таны гэр лүү хүргэж өгнө.",
-    description:
-      "Шинэ Эрүүл Монгол ургацыг хүргүүлэн авах боломжтой",
+      "Өдөр бүр шинэ, эрүүл ахуй, чанарын стандарт хангасан, аюулгүй орчинд тариалсан.",
   },
 ];
 
@@ -46,12 +31,14 @@ export default function Index() {
   const params = useLocalSearchParams<{ login?: string }>();
   const { token, isRestored } = useAuth();
   const openLoginFromParam = params.login === "1";
-  const [current, setCurrent] = useState(openLoginFromParam ? SLIDES.length - 1 : 0);
   const [showLogin, setShowLogin] = useState(openLoginFromParam);
   const [loginImageReady, setLoginImageReady] = useState(openLoginFromParam);
+  const [showPrimaryCta, setShowPrimaryCta] = useState(openLoginFromParam);
   const scrollRef = useRef<ScrollView | null>(null);
   const slideAnim = useRef(new Animated.Value(openLoginFromParam ? 0 : -SCREEN_HEIGHT)).current;
   const slideFadeAnim = useRef(new Animated.Value(0)).current;
+  const slideRiseAnim = useRef(new Animated.Value(openLoginFromParam ? 0 : 10)).current;
+  const ctaFadeAnim = useRef(new Animated.Value(openLoginFromParam ? 1 : 0)).current;
 
   useEffect(() => {
     if (!isRestored) return;
@@ -69,33 +56,42 @@ export default function Index() {
   }, [openLoginFromParam, isRestored]);
 
   useEffect(() => {
-    Animated.timing(slideFadeAnim, {
-      toValue: 1,
-      duration: 600,
-      useNativeDriver: true,
-    }).start();
-  }, [slideFadeAnim]);
+    if (showLogin) return;
+    slideFadeAnim.setValue(0);
+    slideRiseAnim.setValue(10);
+    const t = setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(slideFadeAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideRiseAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }, INITIAL_LOADING_OVERLAY_MS);
+    return () => clearTimeout(t);
+  }, [showLogin, slideFadeAnim, slideRiseAnim]);
 
-  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const next = Math.round(event.nativeEvent.contentOffset.x / width);
-    if (next !== current) {
-      setCurrent(next);
-    }
-  };
+  const handlePrimaryCta = () => setShowLogin(true);
 
-  const goToIndex = (index: number) => {
-    if (!scrollRef.current) return;
-    scrollRef.current.scrollTo({ x: index * width, animated: true });
-    setCurrent(index);
-  };
-
-  const handlePrimaryCta = () => {
-    if (current < SLIDES.length - 1) {
-      goToIndex(current + 1);
-    } else {
-      setShowLogin(true);
-    }
-  };
+  useEffect(() => {
+    if (showLogin) return;
+    setShowPrimaryCta(false);
+    ctaFadeAnim.setValue(0);
+    const t = setTimeout(() => {
+      setShowPrimaryCta(true);
+      Animated.timing(ctaFadeAnim, {
+        toValue: 1,
+        duration: 220,
+        useNativeDriver: true,
+      }).start();
+    }, INITIAL_LOADING_OVERLAY_MS + 3000);
+    return () => clearTimeout(t);
+  }, [showLogin, ctaFadeAnim]);
 
   useEffect(() => {
     if (!showLogin) return;
@@ -108,7 +104,7 @@ export default function Index() {
     if (!showLogin || !loginImageReady) return;
     Animated.timing(slideAnim, {
       toValue: 0,
-      duration: 400,
+      duration: 560,
       useNativeDriver: true,
     }).start();
   }, [showLogin, loginImageReady]);
@@ -116,8 +112,6 @@ export default function Index() {
   const handleLoginContinue = () => {
     router.replace("/(tabs)/home");
   };
-
-  const isLast = current === SLIDES.length - 1;
 
   if (!isRestored || token) {
     return null;
@@ -131,13 +125,13 @@ export default function Index() {
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
-          onScroll={handleScroll}
           scrollEventThrottle={16}
+          scrollEnabled={false}
         >
           {SLIDES.map((slide) => (
             <Animated.View
               key={slide.id}
-              style={[styles.slide, { opacity: slideFadeAnim }]}
+              style={[styles.slide, { opacity: slideFadeAnim, transform: [{ translateY: slideRiseAnim }] }]}
             >
               <Image
                 source={require("../assets/logo.png")}
@@ -151,33 +145,18 @@ export default function Index() {
           ))}
         </ScrollView>
 
-        {/* Pagination + CTAs docked at bottom */}
+        {/* CTA docked at bottom */}
         <View style={styles.footer}>
-          <View style={styles.dotsRow}>
-            {SLIDES.map((slide, index) => {
-              const active = index === current;
-              return (
-                <View
-                  key={slide.id}
-                  style={[
-                    styles.dot,
-                    active && styles.dotActive,
-                  ]}
-                />
-              );
-            })}
-          </View>
-
-          {current >= 2 && (
-            <View style={styles.ctaRow}>
+          {showPrimaryCta ? (
+            <Animated.View style={[styles.ctaRow, { opacity: ctaFadeAnim }]}>
               <Text
                 style={styles.primaryCta}
                 onPress={handlePrimaryCta}
               >
-                {isLast ? "Эхлэх" : "Дараагийн"}
+                Үргэлжлүүлэх
               </Text>
-            </View>
-          )}
+            </Animated.View>
+          ) : null}
         </View>
       </View>
 
@@ -210,7 +189,7 @@ const styles = StyleSheet.create({
   sliderShell: {
     flex: 1,
     justifyContent: "space-between",
-    paddingBottom: 32,
+    paddingBottom: 0,
   },
   slide: {
     width,
@@ -243,29 +222,13 @@ const styles = StyleSheet.create({
   },
   footer: {
     paddingHorizontal: 24,
-    marginTop: 24,
-  },
-  dotsRow: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 18,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 999,
-    backgroundColor: "#E3E3E3",
-  },
-  dotActive: {
-    width: 20,
-    backgroundColor: THEME_PRIMARY,
+    minHeight: 96,
+    justifyContent: "flex-end",
+    paddingBottom: 34,
   },
   ctaRow: {
-    position: "absolute",
-    bottom: 24,
-    right: 24,
+    alignItems: "center",
+    justifyContent: "center",
   },
   secondaryCta: {
     fontSize: 14,

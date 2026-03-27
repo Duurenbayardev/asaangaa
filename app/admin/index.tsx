@@ -37,6 +37,15 @@ export default function AdminDashboard() {
         <Text style={styles.cardTitle}>Захиалга</Text>
         <Text style={styles.cardSub}>Бүх захиалга харах</Text>
       </Pressable>
+
+      <Pressable
+        style={styles.card}
+        onPress={() => router.push("/admin/settings")}
+      >
+        <Ionicons name="options-outline" size={32} color={THEME} />
+        <Text style={styles.cardTitle}>Систем тохиргоо</Text>
+        <Text style={styles.cardSub}>Хүргэлтийн үнэ, НӨАТ</Text>
+      </Pressable>
     </View>
   );
 }

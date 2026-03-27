@@ -338,6 +338,18 @@ export default function ProfileScreen() {
               rightText={formatTugrug(total)}
               onPress={() => router.push("/(tabs)/basket")}
             />
+
+            {user?.role === "admin" ? (
+              <>
+                <View style={styles.divider} />
+                <RowAction
+                  icon="options-outline"
+                  title="Админ тохиргоо"
+                  subtitle="Хүргэлтийн үнэ, НӨАТ, систем"
+                  onPress={() => router.push("/admin/settings")}
+                />
+              </>
+            ) : null}
           </View>
         </View>
 

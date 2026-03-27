@@ -23,7 +23,9 @@ import {
   checkOrderPayment,
   createOrder,
   createOrderWithQPay,
+  getCheckoutSettings,
   getOrder,
+  type CheckoutSettings,
   type CreateOrderResponse,
   type CreateOrderWithQPayResponse,
 } from "../../lib/orders-api";
@@ -148,6 +150,13 @@ function getBankBadge(name: string): { abbr: string; color: string } {
 
 const LOGO_DEV_SIZE = 112;
 const LOGO_DEV_BASE = "https://img.logo.dev";
+const MONGOLIAN_PHONE_LENGTH = 8;
+const DEFAULT_CHECKOUT_SETTINGS: CheckoutSettings = {
+  deliveryFee: 4.99,
+  deliveryFreeThreshold: 30,
+  taxEnabled: true,
+  taxRate: 0.1,
+};
 
 // Local bank/app icons (preferred for QPay screen)
 const BANK_ICON_ASSETS: Record<string, number> = {
@@ -226,6 +235,7 @@ export default function CheckoutConfirmScreen() {
   const [useVerifiedPhone, setUseVerifiedPhone] = useState(!!user?.phone);
   const [phone, setPhone] = useState(user?.phone ?? "");
   const [paymentState, setPaymentState] = useState<CreateOrderWithQPayResponse | null>(null);
+  const [checkoutSettings, setCheckoutSettings] = useState<CheckoutSettings>(DEFAULT_CHECKOUT_SETTINGS);
   const [checkingPayment, setCheckingPayment] = useState(false);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -233,7 +243,27 @@ export default function CheckoutConfirmScreen() {
   const successEnter = useRef(new Animated.Value(0)).current; // 0..1
 
   const verifiedPhone = user?.phone?.trim() ?? "";
-  const hasPhone = useVerifiedPhone ? !!verifiedPhone : phone.trim().length >= 1;
+  const normalizePhone = (value: string) => value.replace(/\D/g, "").slice(0, MONGOLIAN_PHONE_LENGTH);
+  const manualPhone = normalizePhone(phone);
+  const verifiedPhoneNormalized = normalizePhone(verifiedPhone);
+  const activePhone = useVerifiedPhone ? verifiedPhoneNormalized : manualPhone;
+  const hasValidPhone = activePhone.length === MONGOLIAN_PHONE_LENGTH;
+  const showPhoneError = !useVerifiedPhone && manualPhone.length > 0 && manualPhone.length < MONGOLIAN_PHONE_LENGTH;
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const s = await getCheckoutSettings();
+        if (mounted) setCheckoutSettings(s);
+      } catch {
+        // keep defaults
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!showOrderSuccess) return;
@@ -260,8 +290,8 @@ export default function CheckoutConfirmScreen() {
       (sum, item) => sum + item.product.price * item.quantity,
       0
     );
-    const t = sub * 0.1;
-    const del = sub > 30 ? 0 : sub === 0 ? 0 : 4.99;
+    const t = checkoutSettings.taxEnabled ? sub * checkoutSettings.taxRate : 0;
+    const del = sub >= checkoutSettings.deliveryFreeThreshold ? 0 : sub === 0 ? 0 : checkoutSettings.deliveryFee;
     return {
       subtotal: sub,
       tax: t,
@@ -272,7 +302,7 @@ export default function CheckoutConfirmScreen() {
           `${item.quantity} × ${item.product.name} — ${formatTugrug(item.product.price * item.quantity)}`
       ),
     };
-  }, [checkoutItems]);
+  }, [checkoutItems, checkoutSettings]);
 
   const addressLines = useMemo(() => {
     if (!checkoutAddress) return [];
@@ -290,13 +320,17 @@ export default function CheckoutConfirmScreen() {
       router.replace("/(tabs)/profile");
       return;
     }
-    const phoneTrim = useVerifiedPhone && verifiedPhone ? verifiedPhone : phone.trim();
+    const phoneTrim = activePhone;
     if (!token || !checkoutAddress?.id || !checkoutItems?.length) {
       Alert.alert("Алдаа", "Хаяг эсвэл захиалгын мэдээлэл дутуу байна.");
       return;
     }
     if (!phoneTrim) {
-      Alert.alert("Алдаа", "Хүргэлтийн утасны дугаараа оруулна уу эсвэл баталгаажсан дугаараа ашиглана уу.");
+      Alert.alert("Алдаа", "Хүргэлтийн утасны дугаараа оруулна уу.");
+      return;
+    }
+    if (phoneTrim.length !== MONGOLIAN_PHONE_LENGTH) {
+      Alert.alert("Алдаа", "Утасны дугаар 8 оронтой байх ёстой.");
       return;
     }
     setSubmitting(true);
@@ -561,14 +595,24 @@ export default function CheckoutConfirmScreen() {
           ))}
         </View>
 
-        <Text style={[styles.sectionTitle, styles.sectionSpacing]}>Утасны дугаар</Text>
-        <View style={styles.card}>
+        <Text style={[styles.sectionTitle, styles.sectionSpacing]}>Утасны дугаар (заавал)</Text>
+        <View style={[styles.card, styles.phoneCardProminent]}>
+          <View style={styles.phoneHeaderRow}>
+            <Ionicons name="call-outline" size={18} color={THEME_PRIMARY} />
+            <Text style={styles.phoneHeaderTitle}>Хүргэлтийн холбоо барих дугаар</Text>
+          </View>
+          <Text style={styles.phoneHelperText}>Монгол дугаар 8 оронтой байх ёстой.</Text>
           {verifiedPhone ? (
             <>
               {useVerifiedPhone ? (
                 <View style={styles.phoneRow}>
                   <Text style={styles.phoneVerifiedLabel}>Баталгаажсан дугаар ашиглах</Text>
-                  <Text style={styles.phoneVerifiedValue}>{verifiedPhone}</Text>
+                  <Text style={styles.phoneVerifiedValue}>{verifiedPhoneNormalized || verifiedPhone}</Text>
+                  {verifiedPhoneNormalized.length !== MONGOLIAN_PHONE_LENGTH ? (
+                    <Text style={styles.phoneErrorText}>
+                      Энэ баталгаажсан дугаар 8 оронтой биш байна. "Өөр дугаар оруулах"-ыг сонгоно уу.
+                    </Text>
+                  ) : null}
                   <Pressable
                     style={styles.phoneSwitchLink}
                     onPress={() => setUseVerifiedPhone(false)}
@@ -587,26 +631,29 @@ export default function CheckoutConfirmScreen() {
                     </Text>
                   </Pressable>
                   <TextInput
-                    style={[styles.phoneInput, styles.phoneInputTop]}
-                    placeholder="Эсвэл өөр утасны дугаар оруулах"
+                    style={[styles.phoneInput, styles.phoneInputTop, showPhoneError && styles.phoneInputError]}
+                    placeholder="Утасны дугаар (8 орон)"
                     placeholderTextColor="#B0B0B0"
-                    value={phone}
-                    onChangeText={setPhone}
+                    value={manualPhone}
+                    onChangeText={(t) => setPhone(normalizePhone(t))}
                     keyboardType="phone-pad"
+                    maxLength={MONGOLIAN_PHONE_LENGTH}
                   />
                 </View>
               )}
             </>
           ) : (
             <TextInput
-              style={styles.phoneInput}
-              placeholder="Хүргэлттэй холбохоор утасны дугаар"
+              style={[styles.phoneInput, showPhoneError && styles.phoneInputError]}
+              placeholder="Утасны дугаар (8 орон)"
               placeholderTextColor="#B0B0B0"
-              value={phone}
-              onChangeText={setPhone}
+              value={manualPhone}
+              onChangeText={(t) => setPhone(normalizePhone(t))}
               keyboardType="phone-pad"
+              maxLength={MONGOLIAN_PHONE_LENGTH}
             />
           )}
+          {showPhoneError ? <Text style={styles.phoneErrorText}>Утасны дугаар 8 оронтой байх ёстой.</Text> : null}
         </View>
 
         <Text style={[styles.sectionTitle, styles.sectionSpacing]}>Төлбөрийн тойм</Text>
@@ -639,9 +686,9 @@ export default function CheckoutConfirmScreen() {
         <TouchableOpacity
           style={[
             styles.confirmButton,
-            (submitting || !hasPhone) && styles.confirmButtonDisabled,
+            (submitting || !hasValidPhone) && styles.confirmButtonDisabled,
           ]}
-          onPress={submitting || !hasPhone ? undefined : handleConfirm}
+          onPress={submitting || !hasValidPhone ? undefined : handleConfirm}
           disabled={submitting}
         >
           <Text style={styles.confirmButtonText}>
@@ -1078,8 +1125,32 @@ const styles = StyleSheet.create({
     color: "#111111",
     backgroundColor: "#FAFAFA",
   },
+  phoneInputError: {
+    borderColor: "#D32F2F",
+    backgroundColor: "#FFF6F6",
+  },
   phoneInputTop: {
     marginTop: 10,
+  },
+  phoneCardProminent: {
+    borderColor: "#E9D7F2",
+    borderWidth: 2,
+  },
+  phoneHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 4,
+  },
+  phoneHeaderTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#2A1033",
+  },
+  phoneHelperText: {
+    fontSize: 13,
+    color: "#5E4C63",
+    marginBottom: 10,
   },
   phoneRow: {
     gap: 4,
@@ -1109,6 +1180,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: THEME_PRIMARY,
     fontWeight: "500",
+  },
+  phoneErrorText: {
+    marginTop: 8,
+    fontSize: 12,
+    color: "#C62828",
+    fontWeight: "600",
   },
   summaryRow: {
     flexDirection: "row",

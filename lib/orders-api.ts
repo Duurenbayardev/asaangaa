@@ -30,6 +30,13 @@ export interface CreateOrderWithQPayResponse {
   };
 }
 
+export interface CheckoutSettings {
+  deliveryFee: number;
+  deliveryFreeThreshold: number;
+  taxEnabled: boolean;
+  taxRate: number;
+}
+
 export async function createOrderWithQPay(
   token: string,
   body: { addressId: string; phone: string; itemIds?: string[] }
@@ -42,6 +49,13 @@ export async function createOrderWithQPay(
   const data = await parseJsonResponse(res);
   if (!res.ok) throw data;
   return data as CreateOrderWithQPayResponse;
+}
+
+export async function getCheckoutSettings(): Promise<CheckoutSettings> {
+  const res = await fetch(`${getApiBaseUrl()}/orders/settings`);
+  const data = await parseJsonResponse(res);
+  if (!res.ok) throw data;
+  return data as CheckoutSettings;
 }
 
 export async function createOrder(

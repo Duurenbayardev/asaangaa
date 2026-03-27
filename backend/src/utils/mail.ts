@@ -91,6 +91,7 @@ export type AdminOrderEmailData = {
   items: Array<{ name: string; qty: number }>;
   phone?: string;
   city?: string;
+  fullAddress?: string;
 };
 
 export async function sendAdminNewOrderEmail(to: string, data: AdminOrderEmailData): Promise<void> {
@@ -104,6 +105,7 @@ export async function sendAdminNewOrderEmail(to: string, data: AdminOrderEmailDa
     `Нийт: ${data.grandTotal}\n` +
     (data.phone ? `Утас: ${data.phone}\n` : "") +
     (data.city ? `Хот/Аймаг: ${data.city}\n` : "") +
+    (data.fullAddress ? `Хаяг: ${data.fullAddress}\n` : "") +
     `Огноо: ${data.createdAtIso}\n\n` +
     `Бараа:\n${lines}\n`;
 
@@ -114,6 +116,7 @@ export async function sendAdminNewOrderEmail(to: string, data: AdminOrderEmailDa
     `<p><strong>Нийт:</strong> ${data.grandTotal}</p>` +
     (data.phone ? `<p><strong>Утас:</strong> ${escapeHtml(data.phone)}</p>` : "") +
     (data.city ? `<p><strong>Хот/Аймаг:</strong> ${escapeHtml(data.city)}</p>` : "") +
+    (data.fullAddress ? `<p><strong>Хаяг:</strong> ${escapeHtml(data.fullAddress)}</p>` : "") +
     `<p><strong>Огноо:</strong> ${escapeHtml(data.createdAtIso)}</p>` +
     `<p><strong>Бараа:</strong></p>` +
     `<ul>${data.items.map((i) => `<li>${escapeHtml(i.name)} × ${i.qty}</li>`).join("")}</ul>`;

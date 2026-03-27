@@ -160,7 +160,7 @@ export default function CheckoutAddressScreen() {
               />
               <TextInput
                 style={[styles.input, styles.halfInput]}
-                placeholder="Хаалганы дугаар"
+                placeholder="Байр/Хаалга"
                 placeholderTextColor="#B0B0B0"
                 value={postalCode}
                 onChangeText={setPostalCode}

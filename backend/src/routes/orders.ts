@@ -6,12 +6,9 @@ import { auth, requireUser } from "../middleware/auth";
 import { checkPayment, createInvoice, isQPayConfigured } from "../services/qpay";
 import { config } from "../config";
 import { sendAdminNewOrderEmail } from "../utils/mail";
+import { getAppSettings } from "../utils/appSettings";
 
 const router = Router();
-
-const TAX_RATE = 0.1;
-const DELIVERY_FREE_THRESHOLD = 30;
-const DELIVERY_FEE = 4.99;
 
 async function notifyAdminOrder(orderId: string): Promise<void> {
   const to = config.admin.mail;
@@ -23,7 +20,20 @@ async function notifyAdminOrder(orderId: string): Promise<void> {
   });
   if (!order) return;
 
-  const address = order.addressSnapshot as { phone?: string; city?: string } | null;
+  const address = order.addressSnapshot as {
+    fullName?: string;
+    line1?: string;
+    line2?: string;
+    city?: string;
+    postalCode?: string;
+    phone?: string;
+    instructions?: string;
+  } | null;
+  const fullAddress = address
+    ? [address.fullName, address.line1, address.line2, address.city, address.postalCode, address.instructions]
+        .filter((v) => Boolean(v && String(v).trim()))
+        .join(", ")
+    : undefined;
 
   await sendAdminNewOrderEmail(to, {
     id: order.id,
@@ -33,8 +43,18 @@ async function notifyAdminOrder(orderId: string): Promise<void> {
     items: order.lines.map((l) => ({ name: l.productName, qty: l.quantity })),
     phone: address?.phone,
     city: address?.city,
+    fullAddress,
   });
 }
+
+router.get("/settings", async (_req, res, next) => {
+  try {
+    const settings = await getAppSettings();
+    res.json(settings);
+  } catch (e) {
+    next(e);
+  }
+});
 
 // QPay callback: no auth (QPay server calls this)
 router.post("/qpay-callback", async (req, res, next) => {
@@ -127,12 +147,13 @@ router.post(
         return;
       }
 
+      const settings = await getAppSettings();
       const subtotal = cartItems.reduce(
         (sum, c) => sum + Number(c.product.price) * c.quantity,
         0
       );
-      const tax = subtotal * TAX_RATE;
-      const delivery = subtotal >= DELIVERY_FREE_THRESHOLD ? 0 : DELIVERY_FEE;
+      const tax = settings.taxEnabled ? subtotal * settings.taxRate : 0;
+      const delivery = subtotal >= settings.deliveryFreeThreshold ? 0 : settings.deliveryFee;
       const grandTotal = subtotal + tax + delivery;
 
       const addressSnapshot = {
@@ -265,12 +286,13 @@ router.post(
         return;
       }
 
+      const settings = await getAppSettings();
       const subtotal = cartItems.reduce(
         (sum, c) => sum + Number(c.product.price) * c.quantity,
         0
       );
-      const tax = subtotal * TAX_RATE;
-      const delivery = subtotal >= DELIVERY_FREE_THRESHOLD ? 0 : DELIVERY_FEE;
+      const tax = settings.taxEnabled ? subtotal * settings.taxRate : 0;
+      const delivery = subtotal >= settings.deliveryFreeThreshold ? 0 : settings.deliveryFee;
       const grandTotal = subtotal + tax + delivery;
 
       const addressSnapshot = {

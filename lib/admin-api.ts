@@ -2,6 +2,13 @@ import type { Product } from "../types/api";
 import { getApiBaseUrl, parseJsonResponse } from "./api-client";
 import { getAuthHeaders } from "./auth-api";
 
+export type AdminAppSettings = {
+  deliveryFee: number;
+  deliveryFreeThreshold: number;
+  taxEnabled: boolean;
+  taxRate: number;
+};
+
 export async function getAdminProducts(token: string): Promise<Product[]> {
   const res = await fetch(`${getApiBaseUrl()}/admin/products`, {
     headers: getAuthHeaders(token),
@@ -148,4 +155,27 @@ export interface AdminOrder {
   delivery: number;
   grandTotal: number;
   createdAt: string;
+}
+
+export async function getAdminSettings(token: string): Promise<AdminAppSettings> {
+  const res = await fetch(`${getApiBaseUrl()}/admin/settings`, {
+    headers: getAuthHeaders(token),
+  });
+  const data = await parseJsonResponse(res);
+  if (!res.ok) throw data;
+  return data as AdminAppSettings;
+}
+
+export async function updateAdminSettings(
+  token: string,
+  body: Partial<AdminAppSettings>
+): Promise<AdminAppSettings> {
+  const res = await fetch(`${getApiBaseUrl()}/admin/settings`, {
+    method: "PUT",
+    headers: { ...getAuthHeaders(token), "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await parseJsonResponse(res);
+  if (!res.ok) throw data;
+  return data as AdminAppSettings;
 }

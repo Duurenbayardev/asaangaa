@@ -31,6 +31,7 @@ export default function AdminLayout() {
       }}
     >
       <Stack.Screen name="index" options={{ title: "Удирдлага" }} />
+      <Stack.Screen name="settings" options={{ title: "Систем тохиргоо" }} />
       <Stack.Screen name="products" options={{ title: "Бүтээгдэхүүн" }} />
       <Stack.Screen name="orders" options={{ title: "Захиалга", headerShown: false }} />
       <Stack.Screen name="product/[id]" options={{ title: "Бүтээгдэхүүн" }} />
