@@ -400,7 +400,12 @@ function toOrderJson(o: {
 router.get("/", async (req, res, next) => {
   try {
     const orders = await prisma.order.findMany({
-      where: { userId: req.userId! },
+      where: {
+        userId: req.userId!,
+        status: {
+          in: ["confirmed", "processing", "shipped", "delivered"],
+        },
+      },
       orderBy: { createdAt: "desc" },
       include: { lines: true },
     });
