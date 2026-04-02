@@ -30,12 +30,21 @@ CREATE TABLE IF NOT EXISTS app_settings (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 )
 `;
-const SETTINGS_ALTER_SQL = `
+const SETTINGS_ADD_SUPPORT_PHONE_SQL = `
 ALTER TABLE app_settings
-  ADD COLUMN IF NOT EXISTS support_phone TEXT NOT NULL DEFAULT '+97699119911';
-ALTER TABLE app_settings
-  ADD COLUMN IF NOT EXISTS support_email TEXT NOT NULL DEFAULT 'support@asaangaa.mn';
+  ADD COLUMN IF NOT EXISTS support_phone TEXT NOT NULL DEFAULT '+97699119911'
 `;
+
+const SETTINGS_ADD_SUPPORT_EMAIL_SQL = `
+ALTER TABLE app_settings
+  ADD COLUMN IF NOT EXISTS support_email TEXT NOT NULL DEFAULT 'support@asaangaa.mn'
+`;
+
+async function ensureSettingsTable(): Promise<void> {
+  await prisma.$executeRawUnsafe(SETTINGS_TABLE_SQL);
+  await prisma.$executeRawUnsafe(SETTINGS_ADD_SUPPORT_PHONE_SQL);
+  await prisma.$executeRawUnsafe(SETTINGS_ADD_SUPPORT_EMAIL_SQL);
+}
 
 function sanitize(input: Partial<AppSettings> | undefined | null): AppSettings {
   const src = input ?? {};
@@ -76,8 +85,7 @@ function sanitize(input: Partial<AppSettings> | undefined | null): AppSettings {
 
 export async function getAppSettings(): Promise<AppSettings> {
   try {
-    await prisma.$executeRawUnsafe(SETTINGS_TABLE_SQL);
-    await prisma.$executeRawUnsafe(SETTINGS_ALTER_SQL);
+    await ensureSettingsTable();
     const rows = await prisma.$queryRaw<
       Array<{
         delivery_fee: number;
@@ -105,21 +113,24 @@ export async function getAppSettings(): Promise<AppSettings> {
 
 export async function saveAppSettings(next: Partial<AppSettings>): Promise<AppSettings> {
   const merged = sanitize({ ...(await getAppSettings()), ...next });
-  await prisma.$executeRawUnsafe(SETTINGS_TABLE_SQL);
-  await prisma.$executeRawUnsafe(SETTINGS_ALTER_SQL);
-  await prisma.$executeRaw`
-    INSERT INTO app_settings (id, delivery_fee, delivery_free_threshold, tax_enabled, tax_rate, support_phone, support_email, updated_at)
-    VALUES (1, ${merged.deliveryFee}, ${merged.deliveryFreeThreshold}, ${merged.taxEnabled}, ${merged.taxRate}, ${merged.supportPhone}, ${merged.supportEmail}, NOW())
-    ON CONFLICT (id)
-    DO UPDATE SET
-      delivery_fee = EXCLUDED.delivery_fee,
-      delivery_free_threshold = EXCLUDED.delivery_free_threshold,
-      tax_enabled = EXCLUDED.tax_enabled,
-      tax_rate = EXCLUDED.tax_rate,
-      support_phone = EXCLUDED.support_phone,
-      support_email = EXCLUDED.support_email,
-      updated_at = NOW()
-  `;
+  await prisma.$transaction(async (tx) => {
+    await tx.$executeRawUnsafe(SETTINGS_TABLE_SQL);
+    await tx.$executeRawUnsafe(SETTINGS_ADD_SUPPORT_PHONE_SQL);
+    await tx.$executeRawUnsafe(SETTINGS_ADD_SUPPORT_EMAIL_SQL);
+    await tx.$executeRaw`
+      INSERT INTO app_settings (id, delivery_fee, delivery_free_threshold, tax_enabled, tax_rate, support_phone, support_email, updated_at)
+      VALUES (1, ${merged.deliveryFee}, ${merged.deliveryFreeThreshold}, ${merged.taxEnabled}, ${merged.taxRate}, ${merged.supportPhone}, ${merged.supportEmail}, NOW())
+      ON CONFLICT (id)
+      DO UPDATE SET
+        delivery_fee = EXCLUDED.delivery_fee,
+        delivery_free_threshold = EXCLUDED.delivery_free_threshold,
+        tax_enabled = EXCLUDED.tax_enabled,
+        tax_rate = EXCLUDED.tax_rate,
+        support_phone = EXCLUDED.support_phone,
+        support_email = EXCLUDED.support_email,
+        updated_at = NOW()
+    `;
+  });
   return merged;
 }
 
